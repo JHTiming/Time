@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Zeiterfassung</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F3EE; --surface: #FFFFFF; --border: #E0DDD6;
+    --text: #1A1916; --muted: #7A7870; --radius: 14px; --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 0 0 120px; }
+  header { padding: 28px 20px 16px; display: flex; align-items: baseline; justify-content: space-between; }
+  header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  header span { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  /* PIN SCREEN */
+  .pin-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; padding: 20px; }
+  .pin-screen h2 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .pin-screen p { font-size: 14px; color: var(--muted); margin-bottom: 32px; text-align: center; line-height: 1.5; }
+  .pin-dots { display: flex; gap: 14px; margin-bottom: 32px; }
+  .pin-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); background: transparent; transition: all 0.15s; }
+  .pin-dot.filled { background: var(--text); border-color: var(--text); }
+  .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 240px; }
+  .pin-key { height: 64px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--surface); font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 600; cursor: pointer; transition: all 0.1s; color: var(--text); }
+  .pin-key:active { background: var(--text); color: var(--bg); transform: scale(0.95); }
+  .pin-key.del { font-size: 16px; color: var(--muted); }
+  .pin-error { color: #e55; font-size: 13px; margin-top: 12px; min-height: 20px; }
+  .pin-setup-info { font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; line-height: 1.6; }
+
+  /* SYNC INDICATOR */
+  .sync-bar { display: flex; align-items: center; gap: 8px; padding: 6px 16px; font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; min-height: 24px; }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .sync-dot.syncing { background: #F5A623; animation: pulse 1s infinite; }
+  .sync-dot.ok { background: #4CAF50; }
+  .sync-dot.err { background: #e55; }
+
+  .projects-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
+  .project-card { border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: transform 0.15s ease; user-select: none; }
+  .project-card:active { transform: scale(0.97); }
+  .project-card.active-tracking { box-shadow: 0 0 0 3px var(--card-color, #333); }
+  .card-main { padding: 18px 16px 14px; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; }
+  .card-kuerzel { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
+  .card-meta { display: flex; flex-direction: column; gap: 2px; }
+  .card-name { font-size: 11px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-total { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; }
+  .timer-bar { background: rgba(0,0,0,0.12); padding: 7px 16px; font-family: 'DM Mono', monospace; font-size: 12px; display: none; align-items: center; gap: 6px; }
+  .timer-dot { width: 7px; height: 7px; border-radius: 50%; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .timer-bar.visible { display: flex; }
+
+  .dropdown { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin: 0 16px; overflow: hidden; display: none; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .dropdown.open { display: block; }
+  .dropdown-header { padding: 14px 16px 10px; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .kategorie-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 12px 12px; }
+  .kat-btn { padding: 10px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--bg); font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s; }
+  .kat-btn:hover { border-color: var(--text); }
+  .kat-btn.selected { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .taetigkeit-wrap { padding: 0 12px 12px; display: none; }
+  .taetigkeit-wrap.visible { display: block; }
+  .taetigkeit-input { width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); font-family: 'Syne', sans-serif; font-size: 14px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; }
+  .taetigkeit-input:focus { border-color: var(--text); }
+  .start-btn { display: block; width: calc(100% - 24px); margin: 0 12px 14px; padding: 13px; background: var(--text); color: var(--bg); border: none; border-radius: var(--radius-sm); font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+  .start-btn:active { opacity: 0.8; }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; padding: 10px 16px 20px; gap: 8px; }
+  .nav-btn { flex: 1; padding: 11px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: transparent; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; transition: all 0.15s; }
+  .nav-btn:hover { background: var(--bg); }
+  .nav-btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+  .view { display: none; padding: 0 16px; }
+  .view.active { display: block; }
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .form-input { width: 100%; padding: 12px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); font-family: 'Syne', sans-serif; font-size: 15px; background: var(--surface); color: var(--text); outline: none; transition: border-color 0.15s; }
+  .form-input:focus { border-color: var(--text); }
+  .color-picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 4px; }
+  .color-swatch { height: 40px; border-radius: var(--radius-sm); cursor: pointer; border: 3px solid transparent; transition: border-color 0.15s; }
+  .color-swatch.selected { border-color: var(--text); }
+  .section-title { font-size: 18px; font-weight: 700; margin: 20px 0 16px; letter-spacing: -0.3px; }
+  .project-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .proj-pill { padding: 7px 14px; border-radius: 30px; border: 1.5px solid var(--border); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: 'Syne', sans-serif; }
+  .export-btn { width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: transparent; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text); transition: all 0.15s; }
+  .export-btn:hover { background: var(--bg); }
+  .add-entry-btn { width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1.5px dashed var(--border); background: transparent; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 12px; color: var(--muted); transition: all 0.15s; }
+  .add-entry-btn:hover { border-color: var(--text); color: var(--text); background: var(--bg); }
+  .time-table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
+  .time-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 520px; }
+  .time-table th { background: var(--bg); padding: 10px 10px; text-align: left; font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid var(--border); }
+  .time-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; font-family: 'DM Mono', monospace; font-size: 11px; }
+  .time-table tr:last-child td { border-bottom: none; }
+  .time-table tr.data-row:hover td { background: var(--bg); }
+  .kat-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; font-family: 'Syne', sans-serif; }
+  .total-row td { font-weight: 700; border-top: 2px solid var(--border); background: var(--bg); font-size: 12px; }
+  .edit-row-btn { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 600; transition: all 0.15s; white-space: nowrap; }
+  .edit-row-btn:hover { border-color: var(--text); color: var(--text); }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(26,25,22,0.5); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: var(--surface); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 400px; max-height: 85vh; overflow-y: auto; }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .modal-footer { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-footer button { flex: 1; padding: 11px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: var(--text); transition: all 0.15s; }
+  .modal-footer .btn-save { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .modal-footer .btn-delete { border-color: #e55; color: #e55; }
+  .modal-kat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .modal-kat-btn { padding: 9px 10px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--bg); font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s; }
+  .modal-kat-btn.selected { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .proj-list-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 8px; }
+  .proj-dot { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+  .proj-info { flex: 1; }
+  .proj-info-name { font-size: 14px; font-weight: 600; }
+  .proj-info-kuerzel { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .del-btn { padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'Syne', sans-serif; transition: all 0.15s; }
+  .del-btn:hover { border-color: #e53; color: #e53; }
+  .notif-banner { background: #1A1916; color: #F5F3EE; border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; margin: 0 16px 12px; display: none; align-items: center; gap: 10px; }
+  .notif-banner.visible { display: flex; }
+  .notif-banner button { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #fff; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-family: 'Syne', sans-serif; }
+  .active-indicator { display: none; align-items: center; gap: 6px; background: #1A1916; color: #F5F3EE; border-radius: 20px; padding: 5px 12px; font-size: 11px; font-weight: 600; margin: 0 16px 12px; }
+  .active-indicator.visible { display: inline-flex; }
+  .active-indicator .dot { width: 7px; height: 7px; border-radius: 50%; background: #6EE7B7; animation: pulse 1.2s infinite; }
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .stat-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+  .stat-val { font-size: 20px; font-weight: 700; font-family: 'DM Mono', monospace; letter-spacing: -0.5px; }
+  .view-tabs { display: flex; gap: 0; margin-bottom: 18px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg); }
+  .view-tab { flex: 1; padding: 9px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: none; background: transparent; font-family: 'Syne', sans-serif; color: var(--muted); }
+  .view-tab.active { background: var(--text); color: var(--bg); }
+  .report-btn { padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'Syne', sans-serif; transition: all 0.15s; }
+  .report-btn:hover { border-color: var(--text); color: var(--text); }
+  .rename-btn { padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'Syne', sans-serif; transition: all 0.15s; }
+  .rename-btn:hover { border-color: var(--text); color: var(--text); }
+  .back-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); background: transparent; border: none; cursor: pointer; font-family: 'Syne', sans-serif; margin-bottom: 16px; padding: 0; }
+  .back-btn:hover { color: var(--text); }
+  .proj-actions { display: flex; gap: 6px; }
+  .toggle-row { display:flex; align-items:center; justify-content:space-between; padding: 10px 0; border-top: 1px solid var(--border); margin-top: 8px; }
+  .toggle-label { font-size: 13px; font-weight: 600; color: var(--text); }
+  .toggle-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .toggle-switch { position:relative; width:44px; height:24px; flex-shrink:0; }
+  .toggle-switch input { opacity:0; width:0; height:0; }
+  .toggle-slider { position:absolute; inset:0; background:var(--border); border-radius:24px; cursor:pointer; transition:.2s; }
+  .toggle-slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+  input:checked + .toggle-slider { background:#e55; }
+  input:checked + .toggle-slider:before { transform:translateX(20px); }
+  .not-counted { color: #e55; font-size: 10px; font-weight:700; }
+  .logout-btn { font-size: 11px; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 10px; cursor: pointer; font-family: 'Syne', sans-serif; }
+  .pause-menu { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin: 0 16px; overflow: hidden; display: none; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .pause-menu.open { display: block; }
+  .pause-menu-title { padding: 12px 16px 8px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .pause-menu-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 12px 12px; }
+  .pause-action-btn { padding: 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--bg); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; color: var(--text); }
+  .pause-action-btn:hover { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .pause-action-btn.stop { border-color: #e55; color: #e55; }
+  .pause-action-btn.stop:hover { background: #e55; color: #fff; }
+  .paused-bar { background: rgba(0,0,0,0.08); padding: 6px 16px; font-family: 'DM Mono', monospace; font-size: 11px; display: none; align-items: center; gap: 6px; }
+  .paused-bar.visible { display: flex; }
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pin-screen-wrap">
+  <div class="pin-screen">
+    <h2 id="pin-title">Willkommen</h2>
+    <p id="pin-subtitle">Bitte lege eine 4-stellige PIN fest.<br>Du brauchst sie beim nächsten Login.</p>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad" id="pin-pad">
+      <button class="pin-key" data-key="1">1</button>
+      <button class="pin-key" data-key="2">2</button>
+      <button class="pin-key" data-key="3">3</button>
+      <button class="pin-key" data-key="4">4</button>
+      <button class="pin-key" data-key="5">5</button>
+      <button class="pin-key" data-key="6">6</button>
+      <button class="pin-key" data-key="7">7</button>
+      <button class="pin-key" data-key="8">8</button>
+      <button class="pin-key" data-key="9">9</button>
+      <button class="pin-key" style="visibility:hidden"></button>
+      <button class="pin-key" data-key="0">0</button>
+      <button class="pin-key del" data-key="del">⌫</button>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+  </div>
+</div>
+
+<!-- MAIN APP (hidden until PIN ok) -->
+<div id="app-wrap" style="display:none">
+  <header>
+    <h1>Zeiterfassung</h1>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="current-date"></span>
+      <button class="logout-btn" onclick="logout()">Abmelden</button>
+    </div>
+  </header>
+
+  <div class="sync-bar"><div class="sync-dot" id="sync-dot"></div><span id="sync-label"></span></div>
+
+  <div class="notif-banner" id="notif-banner">
+    <span>🔔 Push-Benachrichtigungen?</span>
+    <button onclick="requestNotif()">Erlauben</button>
+    <button onclick="document.getElementById('notif-banner').classList.remove('visible')" style="border:none;opacity:0.5;margin-left:4px">✕</button>
+  </div>
+
+  <div class="active-indicator" id="active-indicator">
+    <span class="dot"></span>
+    <span id="active-label">Erfassung läuft</span>
+  </div>
+
+  <div class="view active" id="view-home">
+    <div class="projects-grid" id="projects-grid"></div>
+    <div id="dropdown-container"></div>
+    <div id="pause-menu-container"></div>
+    <div class="empty-state" id="empty-state" style="display:none">Noch keine Projekte.<br>Tippe auf <strong>+ Neu</strong> um loszulegen.</div>
+  </div>
+
+  <div class="view" id="view-new">
+    <p class="section-title">Neues Projekt</p>
+    <div class="form-group">
+      <label class="form-label">Projektname</label>
+      <input class="form-input" id="new-name" type="text" placeholder="z.B. Wohnhaus Müller">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Kürzel (3–5 Buchstaben / Zahlen)</label>
+      <input class="form-input" id="new-kuerzel" type="text" maxlength="5" placeholder="z.B. WM01 oder HAUS2" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:20px;letter-spacing:2px">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Farbe</label>
+      <div class="color-picker" id="color-picker">
+        <div class="color-swatch selected" data-color="#F5C2C2" data-text="#7A3535" style="background:#F5C2C2"></div>
+        <div class="color-swatch" data-color="#FAE8A4" data-text="#6B5200" style="background:#FAE8A4"></div>
+        <div class="color-swatch" data-color="#B8E8D4" data-text="#1F5C43" style="background:#B8E8D4"></div>
+        <div class="color-swatch" data-color="#B8D4F0" data-text="#1F3F6B" style="background:#B8D4F0"></div>
+        <div class="color-swatch" data-color="#F0B8E0" data-text="#6B1F52" style="background:#F0B8E0"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-manage">
+    <p class="section-title" id="manage-title">Projekte</p>
+    <div id="manage-list"></div>
+  </div>
+
+  <div class="view" id="view-report">
+    <p class="section-title">Bericht</p>
+    <div class="view-tabs">
+      <button class="view-tab active" onclick="setReportTab('table')">Tabelle</button>
+      <button class="view-tab" onclick="setReportTab('summary')">Übersicht</button>
+    </div>
+    <div id="report-table-view">
+      <div class="project-selector" id="report-selector"></div>
+      <button class="add-entry-btn" onclick="openAddModal()">+ Eintrag manuell hinzufügen</button>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="export-btn" style="margin-bottom:0" onclick="exportCSV()">⬇ CSV</button>
+        <button class="export-btn" style="margin-bottom:0" onclick="exportPDF()">⬇ PDF</button>
+      </div>
+      <div class="time-table-wrap">
+        <table class="time-table">
+          <thead><tr><th>Datum</th><th>Kategorie</th><th>Tätigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th><th></th></tr></thead>
+          <tbody id="report-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="report-summary-view" style="display:none">
+      <div class="project-selector" id="report-selector-sum"></div>
+      <div class="stat-row" id="summary-cards"></div>
+      <div id="summary-by-kat"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal-box">
+      <div class="modal-title" id="modal-title">Eintrag bearbeiten</div>
+      <div class="form-group">
+        <label class="form-label">Datum</label>
+        <input class="form-input" id="modal-date" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kategorie</label>
+        <div class="modal-kat-grid" id="modal-kat-grid"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tätigkeit</label>
+        <input class="form-input" id="modal-taetigkeit" type="text" placeholder="Kurze Beschreibung">
+      </div>
+      <div class="time-row">
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Startzeit</label><input class="form-input" id="modal-start" type="time"></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Endzeit</label><input class="form-input" id="modal-end" type="time"></div>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Nicht berechnen</div>
+          <div class="toggle-sub">Tätigkeit wird aus Gesamtberechnung ausgeschlossen</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="modal-exclude">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button onclick="closeModal()">Abbrechen</button>
+        <button class="btn-delete" id="modal-delete-btn" onclick="deleteEntry()">Löschen</button>
+        <button class="btn-save" onclick="saveModal()">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Modal -->
+  <div class="modal-overlay" id="rename-modal">
+    <div class="modal-box">
+      <div class="modal-title">Projekt bearbeiten</div>
+      <div class="form-group">
+        <label class="form-label">Projektname</label>
+        <input class="form-input" id="rename-name" type="text" placeholder="Projektname">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kürzel (3–5 Zeichen)</label>
+        <input class="form-input" id="rename-kuerzel" type="text" maxlength="5" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:20px;letter-spacing:2px">
+      </div>
+      <div class="modal-footer">
+        <button data-action="rename-cancel">Abbrechen</button>
+        <button class="btn-save" data-action="rename-save">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn primary" id="nav-home" onclick="showView('home')">Start</button>
+    <button class="nav-btn" id="nav-new" onclick="showView('new')">+ Neu</button>
+    <button class="nav-btn" id="nav-manage" onclick="showView('manage')">Verwalten</button>
+  </div>
+</div>
+
+<!-- PIN Script (plain, not module) -->
+<script>
+const PIN_STORAGE_KEY = 'zeit_pin_hash';
+let pinBuffer = '';
+let pinMode = 'check';
+
+function simpleHash(str) {
+  let h = 0;
+  for (let i=0;i<str.length;i++) { h = ((h<<5)-h)+str.charCodeAt(i); h|=0; }
+  return h.toString(16);
+}
+
+function updatePinDots() {
+  for(let i=0;i<4;i++) document.getElementById('pd'+i).classList.toggle('filled', i<pinBuffer.length);
+}
+
+function pinKey(k) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += k;
+  updatePinDots();
+  if (pinBuffer.length === 4) setTimeout(handlePinComplete, 150);
+}
+
+function pinDel() {
+  pinBuffer = pinBuffer.slice(0,-1);
+  updatePinDots();
+}
+
+function waitForStartApp(hash, attempts) {
+  attempts = attempts || 0;
+  if (window.startApp) {
+    window.startApp(hash);
+  } else if (attempts < 30) {
+    setTimeout(function() { waitForStartApp(hash, attempts + 1); }, 200);
+  } else {
+    document.getElementById('pin-error').textContent = 'Firebase konnte nicht geladen werden. Seite neu laden.';
+    pinBuffer=''; updatePinDots();
+  }
+}
+
+async function handlePinComplete() {
+  const hash = simpleHash(pinBuffer);
+  const stored = localStorage.getItem(PIN_STORAGE_KEY);
+
+  if (pinMode === 'setup') {
+    localStorage.setItem('zeit_pin_temp', hash);
+    document.getElementById('pin-title').textContent = 'PIN bestätigen';
+    document.getElementById('pin-subtitle').textContent = 'Bitte PIN nochmal eingeben.';
+    pinBuffer = ''; updatePinDots();
+    pinMode = 'confirm';
+  } else if (pinMode === 'confirm') {
+    const temp = localStorage.getItem('zeit_pin_temp');
+    if (hash === temp) {
+      localStorage.setItem(PIN_STORAGE_KEY, hash);
+      localStorage.removeItem('zeit_pin_temp');
+      document.getElementById('pin-error').textContent = '';
+      waitForStartApp(hash);
+    } else {
+      document.getElementById('pin-error').textContent = 'PINs stimmen nicht überein.';
+      pinBuffer=''; updatePinDots();
+      pinMode='setup';
+      document.getElementById('pin-title').textContent = 'PIN festlegen';
+      document.getElementById('pin-subtitle').textContent = 'Bitte lege eine 4-stellige PIN fest.';
+    }
+  } else {
+    if (hash === stored) {
+      document.getElementById('pin-error').textContent = '';
+      waitForStartApp(hash);
+    } else {
+      document.getElementById('pin-error').textContent = 'Falsche PIN. Bitte nochmal versuchen.';
+      pinBuffer=''; updatePinDots();
+    }
+  }
+}
+
+// Wire up PIN pad
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('pin-pad').addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-key]');
+    if (!btn) return;
+    const k = btn.dataset.key;
+    if (k === 'del') pinDel();
+    else pinKey(k);
+  });
+
+  // Set initial PIN screen state
+  const stored = localStorage.getItem(PIN_STORAGE_KEY);
+  if (stored) {
+    pinMode = 'check';
+    document.getElementById('pin-title').textContent = 'Anmelden';
+    document.getElementById('pin-subtitle').textContent = 'Bitte PIN eingeben.';
+  } else {
+    pinMode = 'setup';
+    document.getElementById('pin-title').textContent = 'PIN festlegen';
+    document.getElementById('pin-subtitle').textContent = 'Bitte lege eine 4-stellige PIN fest.';
+  }
+});
+</script>
+
+<!-- Firebase compat (classic CDN, no module needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBnNQ_Uvy4RvmjCHPl00FJNFxOjNCRfmRY",
+  authDomain: "zeiterfassung-e34a2.firebaseapp.com",
+  projectId: "zeiterfassung-e34a2",
+  storageBucket: "zeiterfassung-e34a2.firebasestorage.app",
+  messagingSenderId: "206810127985",
+  appId: "1:206810127985:web:d2655243428cee1f6645d0"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// ── CONSTANTS ────────────────────────────────────────────────
+const KATEGORIEN = ['Planung','Ortstermine','Koordination','Organisation'];
+const KAT_COLORS = {'Planung':'#C0392B','Ortstermine':'#1A5276','Koordination':'#7D6608','Organisation':'#1E8449'};
+const PASTEL = [
+  {bg:'#F5C2C2',text:'#7A3535'},{bg:'#FAE8A4',text:'#6B5200'},
+  {bg:'#B8E8D4',text:'#1F5C43'},{bg:'#B8D4F0',text:'#1F3F6B'},{bg:'#F0B8E0',text:'#6B1F52'}
+];
+function getPal(color) { return PASTEL.find(p=>p.bg===color)||{bg:color,text:'#333'}; }
+
+// ── STATE ────────────────────────────────────────────────────
+let state = { projects:[], entries:[], activeTracking:null, pausedTracking:null, selectedColor:'#F5C2C2', reportProject:null, reportTab:'table', reportSingleProject:false };
+// Unique ID for this browser tab/device
+const DEVICE_ID = Math.random().toString(36).slice(2);
+let timerInterval=null, reminderTimeout=null, modalEntryId=null;
+let unsubProjects=null, unsubEntries=null;
+let currentUserId = null; // the shared PIN-based user ID
+
+// PIN handled in separate script below, startApp called via window.startApp
+
+function logout() {
+  if (!confirm('Abmelden? Die Daten bleiben in der Cloud gespeichert.')) return;
+  if (unsubProjects) unsubProjects();
+  if (unsubEntries) unsubEntries();
+  state = { projects:[], entries:[], activeTracking:null, selectedColor:'#F5C2C2', reportProject:null, reportTab:'table' };
+  currentUserId = null;
+  document.getElementById('app-wrap').style.display = 'none';
+  document.getElementById('pin-screen-wrap').style.display = 'block';
+  pinBuffer=''; pinMode='check'; updatePinDots();
+  document.getElementById('pin-title').textContent = 'Anmelden';
+  document.getElementById('pin-subtitle').textContent = 'Bitte PIN eingeben.';
+}
+
+// ── APP START ────────────────────────────────────────────────
+async function startApp(pinHash) {
+  currentUserId = 'user_' + pinHash;
+  setSyncStatus('syncing', 'Verbinde…');
+
+  try {
+    await auth.signInAnonymously();
+  } catch(e) { setSyncStatus('err', 'Auth-Fehler: ' + e.message); console.error(e); return; }
+
+  document.getElementById('pin-screen-wrap').style.display = 'none';
+  document.getElementById('app-wrap').style.display = 'block';
+  document.getElementById('current-date').textContent = new Date().toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});
+
+  // Load data and subscribe to live updates
+  await loadData();
+  await loadActiveTrackingStatus();
+  subscribeToData();
+  subscribeToActiveSession();
+  if (state.activeTracking) startTimerUI(state.activeTracking.projectId);
+  renderHome();
+}
+
+// ── FIRESTORE ────────────────────────────────────────────────
+function setSyncStatus(status, label) {
+  const dot = document.getElementById('sync-dot');
+  dot.className = 'sync-dot ' + status;
+  document.getElementById('sync-label').textContent = label;
+}
+
+async function loadData() {
+  try {
+    setSyncStatus('syncing', 'Lade Daten…');
+    const [pSnap, eSnap] = await Promise.all([
+      db.collection('projects').where('userId','==',currentUserId).get(),
+      db.collection('entries').where('userId','==',currentUserId).get()
+    ]);
+    state.projects = pSnap.docs.map(d=>({...d.data(), _id:d.id}));
+    state.entries = eSnap.docs.map(d=>({...d.data(), _id:d.id}));
+    setSyncStatus('ok', 'Synchronisiert');
+  } catch(e) {
+    setSyncStatus('err', 'Fehler beim Laden');
+    console.error(e);
+  }
+}
+
+function subscribeToData() {
+  unsubProjects = db.collection('projects').where('userId','==',currentUserId).onSnapshot(
+    snap => {
+      state.projects = snap.docs.map(d=>({...d.data(),_id:d.id}));
+      setSyncStatus('ok','Synchronisiert');
+      if (document.getElementById('view-home').classList.contains('active')) renderHome();
+      if (document.getElementById('view-manage').classList.contains('active')) renderManage();
+      if (document.getElementById('view-report').classList.contains('active')) renderReport();
+    }, err => setSyncStatus('err','Sync-Fehler')
+  );
+  unsubEntries = db.collection('entries').where('userId','==',currentUserId).onSnapshot(
+    snap => {
+      const newEntries = snap.docs.map(d=>({...d.data(),_id:d.id}));
+      // Only update if count changed or new entry added (avoid overwriting timer state)
+      state.entries = newEntries;
+      setSyncStatus('ok','Synchronisiert');
+      // Don't re-render home here - it would flicker the timer
+      if (document.getElementById('view-report').classList.contains('active')) renderReport();
+    }, err => setSyncStatus('err','Sync-Fehler')
+  );
+}
+
+function saveActiveTrackingStatus(tracking) {
+  let data;
+  if (!tracking) {
+    data = { active: false, paused: false, writtenBy: DEVICE_ID };
+  } else if (tracking.paused) {
+    data = { active: false, paused: true, projectId: tracking.projectId, kategorie: tracking.kategorie, taetigkeit: tracking.taetigkeit, writtenBy: DEVICE_ID };
+  } else {
+    data = { active: true, paused: false, projectId: tracking.projectId, kategorie: tracking.kategorie, taetigkeit: tracking.taetigkeit, startTime: tracking.startTime, writtenBy: DEVICE_ID };
+  }
+  db.collection('activesessions').doc(currentUserId).set(data)
+    .catch(e => console.error('Session save error', e));
+}
+
+async function loadActiveTrackingStatus() {
+  try {
+    const doc = await db.collection('activesessions').doc(currentUserId).get();
+    if (doc.exists) {
+      const d = doc.data();
+      if (d.active && d.projectId && d.startTime) {
+        // Restore active tracking - startTime is from Firebase so elapsed time is correct
+        state.activeTracking = { projectId: d.projectId, kategorie: d.kategorie, taetigkeit: d.taetigkeit, startTime: d.startTime };
+      } else if (d.paused && d.projectId) {
+        state.pausedTracking = { projectId: d.projectId, kategorie: d.kategorie, taetigkeit: d.taetigkeit };
+      }
+    }
+  } catch(e) {}
+}
+
+function subscribeToActiveSession() {
+  let isFirstSnapshot = true;
+  db.collection('activesessions').doc(currentUserId).onSnapshot(snap => {
+    // Always skip the first snapshot - it's the initial load, not a real-time update
+    if (isFirstSnapshot) { isFirstSnapshot = false; return; }
+    if (!snap.exists) return;
+    const d = snap.data();
+    // Ignore updates written by this device
+    if (d.writtenBy === DEVICE_ID) return;
+
+    if (d.active && d.projectId) {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      state.activeTracking = { projectId: d.projectId, kategorie: d.kategorie, taetigkeit: d.taetigkeit, startTime: d.startTime };
+      state.pausedTracking = null;
+      startTimerUI(d.projectId);
+      renderHome();
+    } else if (d.paused && d.projectId) {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      state.activeTracking = null;
+      state.pausedTracking = { projectId: d.projectId, kategorie: d.kategorie, taetigkeit: d.taetigkeit };
+      renderHome();
+    } else if (!d.active && !d.paused) {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      state.activeTracking = null;
+      state.pausedTracking = null;
+      renderHome();
+    }
+  });
+}
+
+async function saveProject(proj) {
+  setSyncStatus('syncing','Speichere…');
+  try {
+    if (proj._id) {
+      await db.collection('projects').doc(proj._id).set(proj);
+    } else {
+      const ref = await db.collection('projects').add(proj);
+      proj._id = ref.id;
+    }
+    setSyncStatus('ok','Synchronisiert');
+  } catch(e) { setSyncStatus('err','Speicherfehler'); console.error(e); }
+}
+
+async function deleteProjectFromDB(id) {
+  try { await db.collection('projects').doc(id).delete(); } catch(e) {}
+}
+
+async function saveEntry(entry) {
+  setSyncStatus('syncing','Speichere…');
+  try {
+    if (entry._id) {
+      await db.collection('entries').doc(entry._id).set(entry);
+    } else {
+      const ref = await db.collection('entries').add(entry);
+      entry._id = ref.id;
+    }
+    setSyncStatus('ok','Synchronisiert');
+  } catch(e) { setSyncStatus('err','Speicherfehler'); console.error(e); }
+}
+
+async function deleteEntryFromDB(id) {
+  try { await db.collection('entries').doc(id).delete(); } catch(e) {}
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+function formatTime(ms) { const h=Math.floor(ms/3.6e6),m=Math.floor((ms%3.6e6)/60000); return h===0?m+' min':h+'h '+m+'min'; }
+function formatHHMM(ts) { return new Date(ts).toTimeString().slice(0,5); }
+function formatDate(ts) { return new Date(ts).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}); }
+function roundToFive(ms) { return Math.round(ms/60000/5)*5; }
+function totalForProject(pid) { return state.entries.filter(e=>e.projectId===pid).reduce((s,e)=>s+(e.duration||0),0); }
+
+// ── NAV ──────────────────────────────────────────────────────
+function resetNavNew() { const b=document.getElementById('nav-new'); b.textContent='+ Neu'; b.onclick=()=>showView('new'); }
+
+window.showView = function(name) {
+  if (name!=='new') resetNavNew();
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('primary'));
+  const m={home:'nav-home',new:'nav-new',manage:'nav-manage'};
+  if(m[name]) document.getElementById(m[name]).classList.add('primary');
+  if(name==='home') renderHome();
+  if(name==='new') initNewForm();
+  if(name==='manage') { renderManage(); document.getElementById('manage-title').textContent='Projekte'; }
+  if(name==='report') renderReport();
+};
+
+function initNewForm() {
+  document.getElementById('new-name').value='';
+  document.getElementById('new-kuerzel').value='';
+  state.selectedColor='#F5C2C2';
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('selected',s.dataset.color===state.selectedColor));
+  const b=document.getElementById('nav-new');
+  b.textContent='✓ Speichern'; b.classList.add('primary'); b.onclick=doSaveProject;
+}
+
+async function doSaveProject() {
+  const name=document.getElementById('new-name').value.trim();
+  const kuerzel=document.getElementById('new-kuerzel').value.trim().toUpperCase();
+  if(!name||kuerzel.length<3||kuerzel.length>5){alert('Bitte Projektname und 3–5-stelliges Kürzel eingeben.');return;}
+  const proj={userId:currentUserId, id:Date.now(), name, kuerzel, color:state.selectedColor};
+  state.projects.push(proj);
+  await saveProject(proj);
+  showView('home');
+}
+
+// ── HOME ─────────────────────────────────────────────────────
+function renderHome() {
+  const grid=document.getElementById('projects-grid');
+  const dc=document.getElementById('dropdown-container');
+  grid.innerHTML=''; dc.innerHTML='';
+  document.getElementById('empty-state').style.display=state.projects.length===0?'block':'none';
+  state.projects.forEach(p=>{
+    const total=totalForProject(p.id);
+    const isActive=state.activeTracking&&state.activeTracking.projectId===p.id;
+    const pal=getPal(p.color);
+    const card=document.createElement('div');
+    card.className='project-card'+(isActive?' active-tracking':'');
+    card.style.setProperty('--card-color',p.color);
+    const isPaused = state.pausedTracking && state.pausedTracking.projectId === p.id;
+    const elapsed = isActive ? Date.now()-state.activeTracking.startTime : 0;
+    card.innerHTML=`<div class="card-main" style="background:${pal.bg}"><div class="card-kuerzel" style="color:${pal.text}">${p.kuerzel}</div><div class="card-meta"><div class="card-name" style="color:${pal.text}99">${p.name}</div><div class="card-total" style="color:${pal.text}" id="card-total-${p.id}">${formatTime(total)}</div></div></div>${isActive ? `<div class="timer-bar visible" id="timer-bar-${p.id}" style="background:${pal.bg}cc"><div class="timer-dot" style="background:${pal.text}"></div><span id="timer-display-${p.id}" style="color:${pal.text}">${formatTime(elapsed)}</span></div>` : ''}${isPaused ? `<div class="paused-bar visible" style="background:${pal.bg}cc;color:${pal.text}">⏸ Pausiert</div>` : ''}`;
+    card.onclick = isActive ? ()=>showPauseMenu(p.id) : (isPaused ? ()=>showResumeMenu(p.id) : ()=>toggleDropdown(p.id));
+    grid.appendChild(card);
+    const drop=document.createElement('div');
+    drop.className='dropdown'; drop.id='drop-'+p.id;
+    drop.innerHTML=buildDropdown(p); dc.appendChild(drop);
+  });
+  updateActiveIndicator();
+}
+
+function buildDropdown(p) {
+  const kats=KATEGORIEN.map((k,i)=>`<button class="kat-btn" onclick="selectKat(${p.id},'${k}',this)">${i+1}. ${k}</button>`).join('');
+  return `<div class="dropdown-header">${p.name}</div><div class="kategorie-list">${kats}</div><div class="taetigkeit-wrap" id="tat-wrap-${p.id}"><input class="taetigkeit-input" id="tat-input-${p.id}" type="text" placeholder="Kurze Beschreibung…"></div><button class="start-btn" id="start-btn-${p.id}" onclick="startTracking(${p.id})" style="display:none">▶ Erfassung starten</button>`;
+}
+
+let openDropId=null, selectedKat={};
+
+window.toggleDropdown = function(pid) {
+  if(openDropId&&openDropId!==pid){const p=document.getElementById('drop-'+openDropId);if(p)p.classList.remove('open');}
+  const drop=document.getElementById('drop-'+pid);if(!drop)return;
+  drop.classList.toggle('open',!drop.classList.contains('open'));
+  openDropId=drop.classList.contains('open')?pid:null;
+  selectedKat[pid]=null;
+};
+
+window.selectKat = function(pid,kat,btn) {
+  btn.closest('.kategorie-list').querySelectorAll('.kat-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected'); selectedKat[pid]=kat;
+  document.getElementById('tat-wrap-'+pid).classList.add('visible');
+  document.getElementById('start-btn-'+pid).style.display='block';
+  document.getElementById('tat-input-'+pid).focus();
+};
+
+window.startTracking = async function(pid) {
+  if(state.activeTracking){if(!confirm('Läuft bereits. Stoppen und neu starten?'))return;await stopTracking(state.activeTracking.projectId,true);}
+  if(state.pausedTracking && state.pausedTracking.projectId !== pid){if(!confirm('Es gibt eine pausierte Erfassung für ein anderes Projekt. Verwerfen und neu starten?'))return; state.pausedTracking=null;}
+  const kat=selectedKat[pid];
+  const taetigkeit=(document.getElementById('tat-input-'+pid)?.value||'').trim();
+  if(!kat){alert('Bitte Kategorie wählen.');return;}
+  const startTime = Date.now();
+  state.activeTracking={projectId:pid,kategorie:kat,taetigkeit,startTime};
+  const drop=document.getElementById('drop-'+pid);if(drop)drop.classList.remove('open');openDropId=null;
+  saveActiveTrackingStatus({projectId:pid, kategorie:kat, taetigkeit, startTime});
+  startTimerUI(pid);
+  if(reminderTimeout)clearTimeout(reminderTimeout);
+  reminderTimeout=setTimeout(()=>sendReminder(pid),60*60*1000);
+  renderHome(); checkNotifPermission();
+};
+
+function startTimerUI(pid) {
+  if(timerInterval)clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    if(!state.activeTracking){clearInterval(timerInterval);return;}
+    const el=document.getElementById('timer-display-'+pid);
+    if(el)el.textContent=formatTime(Date.now()-state.activeTracking.startTime);
+  },10000);
+}
+
+function showPauseMenu(pid) {
+  const container = document.getElementById('pause-menu-container');
+  container.innerHTML = '';
+  const p = state.projects.find(x=>x.id===pid);
+  const div = document.createElement('div');
+  div.className = 'pause-menu open';
+  div.id = 'pause-menu-'+pid;
+  div.innerHTML = `<div class="pause-menu-title">${p.name} — Was möchtest du tun?</div><div class="pause-menu-btns"><button class="pause-action-btn" id="btn-pause-${pid}">⏸ Pausieren</button><button class="pause-action-btn stop" id="btn-stop-${pid}">⏹ Stoppen</button></div>`;
+  container.appendChild(div);
+  div.onclick = (e) => e.stopPropagation();
+  document.getElementById('btn-pause-'+pid).onclick = (e) => { e.stopPropagation(); pauseTracking(pid); };
+  document.getElementById('btn-stop-'+pid).onclick = (e) => { e.stopPropagation(); container.innerHTML=''; stopTracking(pid); };
+}
+
+function showResumeMenu(pid) {
+  const container = document.getElementById('pause-menu-container');
+  container.innerHTML = '';
+  const p = state.projects.find(x=>x.id===pid);
+  const div = document.createElement('div');
+  div.className = 'pause-menu open';
+  div.id = 'pause-menu-'+pid;
+  div.innerHTML = `<div class="pause-menu-title">${p.name} — Pausiert</div><div class="pause-menu-btns"><button class="pause-action-btn" id="btn-resume-${pid}">▶ Weiter erfassen</button><button class="pause-action-btn stop" id="btn-stoppaused-${pid}">⏹ Endgültig stoppen</button></div>`;
+  container.appendChild(div);
+  div.onclick = (e) => e.stopPropagation();
+  document.getElementById('btn-resume-'+pid).onclick = (e) => { e.stopPropagation(); container.innerHTML=''; resumeTracking(pid); };
+  document.getElementById('btn-stoppaused-'+pid).onclick = (e) => { e.stopPropagation(); container.innerHTML=''; stopPausedTracking(pid); };
+}
+
+async function stopPausedTracking(pid) {
+  // Called when stopped while paused - no active segment to save, just clear
+  state.pausedTracking = null;
+  await saveActiveTrackingStatus(null);
+  renderHome();
+}
+
+function pauseTracking(pid) {
+  if (!state.activeTracking || state.activeTracking.projectId !== pid) return;
+
+  // 1. Capture segment data BEFORE clearing state
+  const segEnd = Date.now();
+  const segDuration = segEnd - state.activeTracking.startTime;
+  const entry = {
+    userId: currentUserId,
+    projectId: pid,
+    kategorie: state.activeTracking.kategorie,
+    taetigkeit: state.activeTracking.taetigkeit,
+    start: state.activeTracking.startTime,
+    end: segEnd,
+    duration: segDuration
+  };
+  const pausedInfo = {
+    projectId: pid,
+    kategorie: state.activeTracking.kategorie,
+    taetigkeit: state.activeTracking.taetigkeit
+  };
+
+  // 2. Update state immediately (synchronous) so UI reacts instantly
+  state.pausedTracking = pausedInfo;
+  state.activeTracking = null;
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  if (reminderTimeout) { clearTimeout(reminderTimeout); reminderTimeout = null; }
+  document.getElementById('pause-menu-container').innerHTML = '';
+  renderHome();
+
+  // 3. Save to Firebase in background (non-blocking)
+  saveEntry(entry);
+  saveActiveTrackingStatus({paused:true, projectId:pid, kategorie:pausedInfo.kategorie, taetigkeit:pausedInfo.taetigkeit});
+}
+
+window.resumeTracking = async function(pid) {
+  if (!state.pausedTracking || state.pausedTracking.projectId !== pid) return;
+  const resumeTime = Date.now();
+  state.activeTracking = {
+    projectId: pid,
+    kategorie: state.pausedTracking.kategorie,
+    taetigkeit: state.pausedTracking.taetigkeit,
+    startTime: resumeTime
+  };
+  state.pausedTracking = null;
+  await saveActiveTrackingStatus({projectId:pid, kategorie:state.activeTracking.kategorie, taetigkeit:state.activeTracking.taetigkeit, startTime:resumeTime});
+  startTimerUI(pid);
+  if (reminderTimeout) clearTimeout(reminderTimeout);
+  reminderTimeout = setTimeout(() => sendReminder(pid), 60 * 60 * 1000);
+  renderHome();
+};
+
+window.stopTracking = async function(pid, silent=false) {
+  if(!state.activeTracking||state.activeTracking.projectId!==pid)return;
+  const segEnd = Date.now();
+  const duration = segEnd - state.activeTracking.startTime;
+  const entry={userId:currentUserId,projectId:pid,kategorie:state.activeTracking.kategorie,taetigkeit:state.activeTracking.taetigkeit,start:state.activeTracking.startTime,end:segEnd,duration};
+  state.activeTracking=null;
+  state.pausedTracking=null;
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+  if(reminderTimeout){clearTimeout(reminderTimeout);reminderTimeout=null;}
+  saveActiveTrackingStatus(null);
+  await saveEntry(entry);
+  if(!silent)renderHome();
+};
+
+function updateActiveIndicator() {
+  const el=document.getElementById('active-indicator');
+  if(state.activeTracking){
+    const p=state.projects.find(x=>x.id===state.activeTracking.projectId);
+    document.getElementById('active-label').textContent=(p?p.kuerzel:'')+' läuft…';
+    el.classList.add('visible');
+  } else if(state.pausedTracking){
+    const p=state.projects.find(x=>x.id===state.pausedTracking.projectId);
+    document.getElementById('active-label').textContent=(p?p.kuerzel:'')+' pausiert';
+    el.classList.add('visible');
+  } else {
+    el.classList.remove('visible');
+  }
+}
+
+function checkNotifPermission(){if('Notification'in window&&Notification.permission==='default')document.getElementById('notif-banner').classList.add('visible');}
+window.requestNotif=function(){Notification.requestPermission().then(()=>document.getElementById('notif-banner').classList.remove('visible'));};
+function sendReminder(pid){if(!state.activeTracking||state.activeTracking.projectId!==pid)return;const p=state.projects.find(x=>x.id===pid);if('Notification'in window&&Notification.permission==='granted')new Notification('Zeiterfassung läuft ⏱',{body:`${p?p.kuerzel:'Projekt'} – Erfassung läuft seit über 1 Stunde.`});reminderTimeout=setTimeout(()=>sendReminder(pid),60*60*1000);}
+
+// ── MANAGE ───────────────────────────────────────────────────
+function renderManage() {
+  const list=document.getElementById('manage-list');list.innerHTML='';
+  if(state.projects.length===0){list.innerHTML='<div class="empty-state">Keine Projekte vorhanden.</div>';return;}
+  state.projects.forEach(p=>{
+    const pal=getPal(p.color);const div=document.createElement('div');div.className='proj-list-item';
+    div.innerHTML=`<div class="proj-dot" style="background:${pal.bg};color:${pal.text}">${p.kuerzel}</div><div class="proj-info"><div class="proj-info-name">${p.name}</div><div class="proj-info-kuerzel">${formatTime(totalForProject(p.id))} erfasst</div></div><div class="proj-actions"><button class="rename-btn" data-dbid="${p._id}" data-action="rename">✎ Umbenennen</button><button class="report-btn" data-dbid="${p._id}" data-pid="${p.id}" data-action="report">Bericht</button><button class="del-btn" data-dbid="${p._id}" data-pid="${p.id}" data-action="delete">Löschen</button></div>`;
+    list.appendChild(div);
+  });
+}
+
+let renameProjectDbId = null;
+
+window.openRenameModal = function(dbId) {
+  const p = state.projects.find(x=>x._id===dbId); if(!p) return;
+  renameProjectDbId = dbId;
+  document.getElementById('rename-name').value = p.name;
+  document.getElementById('rename-kuerzel').value = p.kuerzel;
+  document.getElementById('rename-modal').classList.add('open');
+};
+
+window.closeRenameModal = function() {
+  document.getElementById('rename-modal').classList.remove('open');
+  renameProjectDbId = null;
+};
+
+window.saveRename = async function() {
+  const name = document.getElementById('rename-name').value.trim();
+  const kuerzel = document.getElementById('rename-kuerzel').value.trim().toUpperCase();
+  if(!name||kuerzel.length<3||kuerzel.length>5){alert('Bitte Name und 3–5-stelliges Kürzel eingeben.');return;}
+  const idx = state.projects.findIndex(x=>x._id===renameProjectDbId);
+  if(idx<0) return;
+  state.projects[idx].name = name;
+  state.projects[idx].kuerzel = kuerzel;
+  await saveProject(state.projects[idx]);
+  closeRenameModal();
+  renderManage();
+};
+
+window.openProjectReport = function(dbId, pid) {
+  state.reportProject = pid;
+  state.reportSingleProject = true; // flag: hide project selector
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-report').classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('primary'));
+  document.getElementById('nav-manage').classList.add('primary');
+  renderReport(true);
+};
+
+window.deleteProject = async function(dbId, pid) {
+  if(!confirm('Projekt und alle Einträge löschen?'))return;
+  state.projects=state.projects.filter(p=>p._id!==dbId);
+  const entriesToDel=state.entries.filter(e=>e.projectId===pid);
+  state.entries=state.entries.filter(e=>e.projectId!==pid);
+  if(state.activeTracking&&state.activeTracking.projectId===pid){state.activeTracking=null;if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
+  await deleteProjectFromDB(dbId);
+  await Promise.all(entriesToDel.map(e=>e._id?deleteEntryFromDB(e._id):Promise.resolve()));
+  renderManage();
+};
+
+// Event delegation for manage list buttons
+document.getElementById('manage-list').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const dbId = btn.dataset.dbid;
+  const pid = btn.dataset.pid ? parseInt(btn.dataset.pid) : null;
+  if (action === 'rename') openRenameModal(dbId);
+  if (action === 'report') openProjectReport(dbId, pid);
+  if (action === 'delete') deleteProject(dbId, pid);
+});
+
+// ── REPORT ───────────────────────────────────────────────────
+function renderProjectSelector(cid) {
+  const sel=document.getElementById(cid);sel.innerHTML='';
+  state.projects.forEach(p=>{
+    const pal=getPal(p.color);const pill=document.createElement('div');
+    pill.className='proj-pill'+(state.reportProject===p.id?' selected':'');
+    pill.textContent=p.kuerzel;
+    if(state.reportProject===p.id){pill.style.background=pal.bg;pill.style.color=pal.text;pill.style.borderColor=pal.bg;}
+    pill.onclick=()=>{state.reportProject=p.id;renderReport();};
+    sel.appendChild(pill);
+  });
+}
+
+function renderReport(fromManage) {
+  if(!state.reportProject&&state.projects.length>0)state.reportProject=state.projects[0].id;
+  // Back button
+  const existing = document.getElementById('report-back-btn');
+  if(existing) existing.remove();
+  const backBtn = document.createElement('button');
+  backBtn.className='back-btn'; backBtn.id='report-back-btn';
+  backBtn.innerHTML='← Zurück zu Projekten';
+  backBtn.onclick=()=>{ state.reportSingleProject=false; showView('manage'); };
+  document.getElementById('view-report').insertBefore(backBtn, document.getElementById('view-report').firstChild);
+
+  // Show project name as title when single-project mode
+  const p = state.projects.find(x=>x.id===state.reportProject);
+  const titleEl = document.querySelector('#view-report .section-title');
+  if(titleEl) titleEl.textContent = p ? 'Bericht: ' + p.kuerzel : 'Bericht';
+
+  // Show/hide project selector pills
+  const showSelector = !state.reportSingleProject;
+  document.getElementById('report-selector').style.display = showSelector ? 'flex' : 'none';
+  document.getElementById('report-selector-sum').style.display = showSelector ? 'flex' : 'none';
+
+  renderProjectSelector('report-selector');
+  renderProjectSelector('report-selector-sum');
+  renderReportTable();
+  renderSummary();
+}
+
+window.setReportTab = function(tab) {
+  state.reportTab=tab;
+  document.querySelectorAll('.view-tab').forEach((b,i)=>b.classList.toggle('active',(i===0&&tab==='table')||(i===1&&tab==='summary')));
+  document.getElementById('report-table-view').style.display=tab==='table'?'block':'none';
+  document.getElementById('report-summary-view').style.display=tab==='summary'?'block':'none';
+};
+
+function renderReportTable() {
+  const tbody=document.getElementById('report-body');tbody.innerHTML='';
+  const pid=state.reportProject;
+  const entries=state.entries.filter(e=>e.projectId===pid).sort((a,b)=>a.start-b.start);
+  if(entries.length===0){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">Keine Einträge</td></tr>';return;}
+  let total=0;
+  entries.forEach(e=>{
+    const tr=document.createElement('tr');tr.className='data-row';
+    const kc=KAT_COLORS[e.kategorie]||'#888';
+    if(!e.exclude) total+=e.duration;
+    tr.innerHTML=`<td>${formatDate(e.start)}</td><td><span class="kat-badge" style="background:${kc}22;color:${kc}">${e.kategorie}</span></td><td style="font-family:'Syne',sans-serif;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${e.exclude?'opacity:0.4;text-decoration:line-through':''}">${e.taetigkeit||'–'}</td><td style="${e.exclude?'opacity:0.4':''}">${formatHHMM(e.start)}</td><td style="${e.exclude?'opacity:0.4':''}">${formatHHMM(e.end)}</td><td style="${e.exclude?'opacity:0.4':''}">${Math.floor(e.duration/60000)} min</td><td style="text-align:center">${e.exclude?'<span class="not-counted">✕</span>':''}</td><td><button class="edit-row-btn" onclick="openEditModal('${e._id}')">Bearbeiten</button></td>`;
+    tbody.appendChild(tr);
+  });
+  const r=roundToFive(total),h=Math.floor(r/60),m=r%60;
+  const tr=document.createElement('tr');tr.className='total-row';
+  tr.innerHTML=`<td colspan="7" style="font-size:11px">Gesamt (gerundet 5 min)</td><td>${h>0?h+'h ':'' }${m} min</td>`;
+  tbody.appendChild(tr);
+}
+
+function renderSummary() {
+  const pid=state.reportProject;
+  const entries=state.entries.filter(e=>e.projectId===pid);
+  const totalMs=entries.filter(e=>!e.exclude).reduce((s,e)=>s+(e.duration||0),0);
+  const r=roundToFive(totalMs),h=Math.floor(r/60),m=r%60;
+  document.getElementById('summary-cards').innerHTML=`<div class="stat-card"><div class="stat-label">Gesamt (gerundet)</div><div class="stat-val">${h>0?h+'h ':'' }${m}m</div></div><div class="stat-card"><div class="stat-label">Einträge</div><div class="stat-val">${entries.length}</div></div>`;
+  const byKat={};KATEGORIEN.forEach(k=>byKat[k]=0);entries.forEach(e=>{if(byKat[e.kategorie]!==undefined)byKat[e.kategorie]+=e.duration;});
+  const d2=document.getElementById('summary-by-kat');d2.innerHTML='<div class="stat-label" style="margin-bottom:10px">Nach Kategorie</div>';
+  KATEGORIEN.forEach(k=>{const ms=byKat[k],rm=roundToFive(ms),rh=Math.floor(rm/60),rmm=rm%60,pct=totalMs>0?Math.round(ms/totalMs*100):0,color=KAT_COLORS[k]||'#888';const d=document.createElement('div');d.style.cssText='margin-bottom:10px';d.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:600">${k}</span><span style="font-family:'DM Mono',monospace;color:var(--muted)">${rh>0?rh+'h ':'' }${rmm}m</span></div><div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color};border-radius:3px"></div></div>`;d2.appendChild(d);});
+}
+
+// ── MODAL ────────────────────────────────────────────────────
+function buildModalKatGrid(sel) {
+  const g=document.getElementById('modal-kat-grid');g.innerHTML='';
+  KATEGORIEN.forEach((k,i)=>{const b=document.createElement('button');b.className='modal-kat-btn'+(k===sel?' selected':'');b.textContent=(i+1)+'. '+k;b.onclick=()=>{g.querySelectorAll('.modal-kat-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');};g.appendChild(b);});
+}
+
+window.openAddModal = function() {
+  if(!state.reportProject){alert('Bitte erst Projekt wählen.');return;}
+  modalEntryId=null;document.getElementById('modal-title').textContent='Eintrag hinzufügen';
+  document.getElementById('modal-delete-btn').style.display='none';
+  document.getElementById('modal-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('modal-taetigkeit').value='';
+  document.getElementById('modal-start').value='09:00';document.getElementById('modal-end').value='10:00';
+  document.getElementById('modal-exclude').checked=false;
+  buildModalKatGrid('Planung');document.getElementById('edit-modal').classList.add('open');
+};
+
+window.openEditModal = function(dbId) {
+  const e=state.entries.find(x=>x._id===dbId);if(!e)return;
+  modalEntryId=dbId;document.getElementById('modal-title').textContent='Eintrag bearbeiten';
+  document.getElementById('modal-delete-btn').style.display='block';
+  document.getElementById('modal-date').value=new Date(e.start).toISOString().slice(0,10);
+  document.getElementById('modal-taetigkeit').value=e.taetigkeit||'';
+  document.getElementById('modal-start').value=new Date(e.start).toTimeString().slice(0,5);
+  document.getElementById('modal-end').value=new Date(e.end).toTimeString().slice(0,5);
+  document.getElementById('modal-exclude').checked = !!e.exclude;
+  buildModalKatGrid(e.kategorie);document.getElementById('edit-modal').classList.add('open');
+};
+
+window.closeModal = function() { document.getElementById('edit-modal').classList.remove('open');modalEntryId=null; };
+
+window.saveModal = async function() {
+  const dateVal=document.getElementById('modal-date').value;
+  const startVal=document.getElementById('modal-start').value;
+  const endVal=document.getElementById('modal-end').value;
+  const taetigkeit=document.getElementById('modal-taetigkeit').value.trim();
+  const selBtn=document.querySelector('#modal-kat-grid .modal-kat-btn.selected');
+  const kat=selBtn?selBtn.textContent.replace(/^\d+\. /,''):'';
+  if(!dateVal||!startVal||!endVal||!kat){alert('Bitte alle Felder ausfüllen.');return;}
+  const startTs=new Date(dateVal+'T'+startVal).getTime();
+  const endTs=new Date(dateVal+'T'+endVal).getTime();
+  if(endTs<=startTs){alert('Endzeit muss nach Startzeit liegen.');return;}
+  const duration=endTs-startTs;
+  if(modalEntryId!==null){
+    const idx=state.entries.findIndex(x=>x._id===modalEntryId);
+    const exclude=document.getElementById('modal-exclude').checked;
+    if(idx>=0){state.entries[idx]={...state.entries[idx],kategorie:kat,taetigkeit,start:startTs,end:endTs,duration,exclude};await saveEntry(state.entries[idx]);}
+  } else {
+    const exclude=document.getElementById('modal-exclude').checked;
+    const entry={userId:currentUserId,projectId:state.reportProject,kategorie:kat,taetigkeit,start:startTs,end:endTs,duration,exclude};
+    await saveEntry(entry);
+  }
+  closeModal();renderReport();
+};
+
+window.exportPDF = function() {
+  const pid = state.reportProject; if(!pid) return;
+  const p = state.projects.find(x=>x.id===pid);
+  const entries = state.entries.filter(e=>e.projectId===pid).sort((a,b)=>a.start-b.start);
+  const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  let totalMs = 0;
+  let rows = '';
+  entries.forEach((e,i) => {
+    const mins = Math.floor(e.duration/60000);
+    if(!e.exclude) totalMs += e.duration;
+    const bg = i%2===0 ? '#f9f9f9' : '#ffffff';
+    const strike = e.exclude ? 'text-decoration:line-through;opacity:0.5;' : '';
+    rows += `<tr style="background:${bg}">
+      <td style="${strike}">${formatDate(e.start)}</td>
+      <td style="${strike}">${e.kategorie}</td>
+      <td style="${strike}">${e.taetigkeit||'–'}</td>
+      <td style="${strike}">${formatHHMM(e.start)}</td>
+      <td style="${strike}">${formatHHMM(e.end)}</td>
+      <td style="${strike}">${mins} min</td>
+      <td style="text-align:center;color:#e55;font-weight:700">${e.exclude?'✕':''}</td>
+    </tr>`;
+  });
+
+  const r = roundToFive(totalMs), h = Math.floor(r/60), m = r%60;
+  const totalStr = (h>0?h+'h ':'')+m+' min';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    @page { size: A4 portrait; margin: 20mm 15mm 20mm 15mm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; }
+    .header { display:flex; justify-content:space-between; font-size:10pt; font-weight:normal; border-bottom:1px solid #ccc; padding-bottom:6px; margin-bottom:14px; color:#444; }
+    .project-title { font-size:12pt; font-weight:bold; margin-bottom:14px; }
+    table { width:100%; border-collapse:collapse; }
+    thead tr { background:#e8e8e8; }
+    th { font-size:11pt; font-weight:bold; color:#555; padding:6px 8px; text-align:left; border-bottom:2px solid #ccc; }
+    td { padding:5px 8px; border-bottom:1px solid #eee; font-size:11pt; }
+    .total-row td { font-weight:bold; border-top:2px solid #ccc; background:#f0f0f0; }
+  </style></head><body>
+  <div class="header">
+    <span>Architekturbüro Hormann</span>
+    <span>Arbeitszeiterfassung</span>
+    <span>${today}</span>
+  </div>
+  <div class="project-title">${p?p.kuerzel:''} &nbsp;&nbsp; ${p?p.name:''}</div>
+  <table>
+    <thead><tr><th>Datum</th><th>Kategorie</th><th>Tätigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr class="total-row"><td colspan="6">Gesamt (gerundet 5 min)</td><td>${totalStr}</td></tr></tfoot>
+  </table>
+  </body></html>`;
+
+  const w = window.open('','_blank','width=800,height=600');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>{ w.print(); }, 500);
+};
+
+window.deleteEntry = async function() {
+  if(!modalEntryId)return;if(!confirm('Eintrag löschen?'))return;
+  await deleteEntryFromDB(modalEntryId);
+  state.entries=state.entries.filter(e=>e._id!==modalEntryId);
+  closeModal();renderReport();
+};
+
+window.exportCSV = function() {
+  const pid=state.reportProject;if(!pid)return;
+  const p=state.projects.find(x=>x.id===pid);
+  const entries=state.entries.filter(e=>e.projectId===pid).sort((a,b)=>a.start-b.start);
+  let csv=`Projekt: ${p?p.name:''}\n`+'Datum,Kategorie,Tätigkeit,Start,Ende,Dauer (min)\n';
+  let total=0;
+  entries.forEach(e=>{const mins=Math.floor(e.duration/60000);if(!e.exclude)total+=e.duration;csv+=`"${formatDate(e.start)}","${e.kategorie}","${e.taetigkeit||''}","${formatHHMM(e.start)}","${formatHHMM(e.end)}",${mins},"${e.exclude?'nicht berechnet':''}"
+`;});
+  csv+=`\nGesamt (gerundet 5 min),,,,,${roundToFive(total)}\n`;
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`zeiterfassung_${p?p.kuerzel:'export'}_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
+};
+
+// ── INIT ─────────────────────────────────────────────────────
+document.getElementById('edit-modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('rename-modal').addEventListener('click',function(e){
+  if(e.target===this) { closeRenameModal(); return; }
+  const btn = e.target.closest('[data-action]');
+  if(!btn) return;
+  if(btn.dataset.action==='rename-cancel') closeRenameModal();
+  if(btn.dataset.action==='rename-save') saveRename();
+});
+document.getElementById('color-picker').addEventListener('click',e=>{const s=e.target.closest('.color-swatch');if(!s)return;document.querySelectorAll('.color-swatch').forEach(x=>x.classList.remove('selected'));s.classList.add('selected');state.selectedColor=s.dataset.color;});
+document.getElementById('new-kuerzel').addEventListener('input',function(){this.value=this.value.toUpperCase().replace(/[^A-ZÄÖÜ0-9]/g,'');});
+document.getElementById('rename-kuerzel').addEventListener('input',function(){this.value=this.value.toUpperCase().replace(/[^A-ZÄÖÜ0-9]/g,'');});
+window.logout = logout;
+window.startApp = startApp;
+</script>
+</body>
+</html>
