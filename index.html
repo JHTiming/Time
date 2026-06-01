@@ -94,6 +94,17 @@
   .time-table tr.data-row:hover td { background: var(--bg); }
   .kat-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; font-family: 'Syne', sans-serif; }
   .total-row td { font-weight: 700; border-top: 2px solid var(--border); background: var(--bg); font-size: 12px; }
+  /* Drag and drop */
+  .proj-list-item { cursor: grab; transition: opacity 0.15s, transform 0.15s; }
+  .proj-list-item.dragging { opacity: 0.4; cursor: grabbing; }
+  .proj-list-item.drag-over { transform: translateY(-3px); border-color: var(--text); }
+  .drag-handle { color: var(--muted); font-size: 16px; cursor: grab; padding: 0 6px; user-select: none; }
+  /* Archive badge */
+  .archived-badge { font-size: 10px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 2px 7px; font-weight: 600; }
+  /* Notes in report */
+  .report-notes { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .report-notes-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .report-notes-text { font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
   .edit-row-btn { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; font-size: 11px; color: var(--muted); cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 600; transition: all 0.15s; white-space: nowrap; }
   .edit-row-btn:hover { border-color: var(--text); color: var(--text); }
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(26,25,22,0.5); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
@@ -220,30 +231,36 @@
     <div class="empty-state" id="empty-state" style="display:none">Noch keine Projekte.<br>Tippe auf <strong>+ Neu</strong> um loszulegen.</div>
   </div>
 
-  <div class="view" id="view-new">
-    <p class="section-title">Neues Projekt</p>
-    <div class="form-group">
-      <label class="form-label">Projektname</label>
-      <input class="form-input" id="new-name" type="text" placeholder="z.B. Wohnhaus Müller">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Kürzel (3–5 Buchstaben / Zahlen)</label>
-      <input class="form-input" id="new-kuerzel" type="text" maxlength="5" placeholder="z.B. WM01 oder HAUS2" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:20px;letter-spacing:2px">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Farbe</label>
-      <div class="color-picker" id="color-picker">
-        <div class="color-swatch selected" data-color="#F5C2C2" data-text="#7A3535" style="background:#F5C2C2"></div>
-        <div class="color-swatch" data-color="#FAE8A4" data-text="#6B5200" style="background:#FAE8A4"></div>
-        <div class="color-swatch" data-color="#B8E8D4" data-text="#1F5C43" style="background:#B8E8D4"></div>
-        <div class="color-swatch" data-color="#B8D4F0" data-text="#1F3F6B" style="background:#B8D4F0"></div>
-        <div class="color-swatch" data-color="#F0B8E0" data-text="#6B1F52" style="background:#F0B8E0"></div>
-      </div>
-    </div>
-  </div>
+
 
   <div class="view" id="view-manage">
     <p class="section-title" id="manage-title">Projekte</p>
+    <div id="new-project-form" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Projektname</label>
+        <input class="form-input" id="new-name" type="text" placeholder="z.B. Wohnhaus Müller">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kürzel (3–5 Zeichen)</label>
+        <input class="form-input" id="new-kuerzel" type="text" maxlength="5" placeholder="z.B. WM01" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:20px;letter-spacing:2px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Farbe</label>
+        <div class="color-picker" id="color-picker">
+          <div class="color-swatch selected" data-color="#F5C2C2" data-text="#7A3535" style="background:#F5C2C2"></div>
+          <div class="color-swatch" data-color="#FAE8A4" data-text="#6B5200" style="background:#FAE8A4"></div>
+          <div class="color-swatch" data-color="#B8E8D4" data-text="#1F5C43" style="background:#B8E8D4"></div>
+          <div class="color-swatch" data-color="#B8D4F0" data-text="#1F3F6B" style="background:#B8D4F0"></div>
+          <div class="color-swatch" data-color="#F0B8E0" data-text="#6B1F52" style="background:#F0B8E0"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:20px">
+        <button class="nav-btn" onclick="cancelNewProject()">Abbrechen</button>
+        <button class="nav-btn primary" onclick="doSaveProject()">✓ Speichern</button>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin-bottom:16px">
+    </div>
+    <button class="add-entry-btn" id="add-project-btn" onclick="toggleNewProjectForm()">+ Neues Projekt anlegen</button>
     <div id="manage-list"></div>
   </div>
 
@@ -311,7 +328,7 @@
     </div>
   </div>
 
-  <!-- Rename Modal -->
+  <!-- Project Edit Modal -->
   <div class="modal-overlay" id="rename-modal">
     <div class="modal-box">
       <div class="modal-title">Projekt bearbeiten</div>
@@ -323,16 +340,52 @@
         <label class="form-label">Kürzel (3–5 Zeichen)</label>
         <input class="form-input" id="rename-kuerzel" type="text" maxlength="5" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:20px;letter-spacing:2px">
       </div>
-      <div class="modal-footer">
-        <button data-action="rename-cancel">Abbrechen</button>
-        <button class="btn-save" data-action="rename-save">Speichern</button>
+      <div class="form-group">
+        <label class="form-label">Farbe</label>
+        <div class="color-picker" id="rename-color-picker">
+          <div class="color-swatch" data-color="#F5C2C2" style="background:#F5C2C2"></div>
+          <div class="color-swatch" data-color="#FAE8A4" style="background:#FAE8A4"></div>
+          <div class="color-swatch" data-color="#B8E8D4" style="background:#B8E8D4"></div>
+          <div class="color-swatch" data-color="#B8D4F0" style="background:#B8D4F0"></div>
+          <div class="color-swatch" data-color="#F0B8E0" style="background:#F0B8E0"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notizen</label>
+        <textarea class="form-input" id="rename-notes" rows="3" placeholder="Projektnotizen (optional)..." style="resize:vertical;font-size:13px"></textarea>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Notizen im Bericht anzeigen</div>
+          <div class="toggle-sub">Erscheint unterhalb der Tabelle</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="rename-show-notes">
+          <span class="toggle-slider" style=""></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Projekt archivieren</div>
+          <div class="toggle-sub">Auf Startseite ausblenden</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="rename-archived">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="modal-footer" style="flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px;width:100%">
+          <button data-action="rename-cancel" style="flex:1">Abbrechen</button>
+          <button class="btn-save" data-action="rename-save" style="flex:2">Speichern</button>
+        </div>
+        <button class="btn-delete" data-action="rename-delete" style="width:100%">Projekt löschen</button>
       </div>
     </div>
   </div>
 
   <div class="bottom-nav">
     <button class="nav-btn primary" id="nav-home" onclick="showView('home')">Start</button>
-    <button class="nav-btn" id="nav-new" onclick="showView('new')">+ Neu</button>
     <button class="nav-btn" id="nav-manage" onclick="showView('manage')">Verwalten</button>
   </div>
 </div>
@@ -654,38 +707,48 @@ function roundToFive(ms) { return Math.round(ms/60000/5)*5; }
 function totalForProject(pid) { return state.entries.filter(e=>e.projectId===pid).reduce((s,e)=>s+(e.duration||0),0); }
 
 // ── NAV ──────────────────────────────────────────────────────
-function resetNavNew() { const b=document.getElementById('nav-new'); b.textContent='+ Neu'; b.onclick=()=>showView('new'); }
+function resetNavNew() { /* nav-new removed */ }
 
 window.showView = function(name) {
-  if (name!=='new') resetNavNew();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('primary'));
-  const m={home:'nav-home',new:'nav-new',manage:'nav-manage'};
+  const m={home:'nav-home',manage:'nav-manage'};
   if(m[name]) document.getElementById(m[name]).classList.add('primary');
   if(name==='home') renderHome();
-  if(name==='new') initNewForm();
-  if(name==='manage') { renderManage(); document.getElementById('manage-title').textContent='Projekte'; }
+  if(name==='manage') { renderManage(); }
   if(name==='report') renderReport();
 };
 
-function initNewForm() {
-  document.getElementById('new-name').value='';
-  document.getElementById('new-kuerzel').value='';
-  state.selectedColor='#F5C2C2';
-  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('selected',s.dataset.color===state.selectedColor));
-  const b=document.getElementById('nav-new');
-  b.textContent='✓ Speichern'; b.classList.add('primary'); b.onclick=doSaveProject;
-}
+window.toggleNewProjectForm = function() {
+  const form = document.getElementById('new-project-form');
+  const btn = document.getElementById('add-project-btn');
+  const isOpen = form.style.display !== 'none';
+  form.style.display = isOpen ? 'none' : 'block';
+  btn.textContent = isOpen ? '+ Neues Projekt anlegen' : '✕ Abbrechen';
+  if (!isOpen) {
+    document.getElementById('new-name').value='';
+    document.getElementById('new-kuerzel').value='';
+    state.selectedColor='#F5C2C2';
+    document.querySelectorAll('#color-picker .color-swatch').forEach(s=>s.classList.toggle('selected',s.dataset.color===state.selectedColor));
+    document.getElementById('new-name').focus();
+  }
+};
+
+window.cancelNewProject = function() {
+  document.getElementById('new-project-form').style.display='none';
+  document.getElementById('add-project-btn').textContent='+ Neues Projekt anlegen';
+};
 
 async function doSaveProject() {
   const name=document.getElementById('new-name').value.trim();
   const kuerzel=document.getElementById('new-kuerzel').value.trim().toUpperCase();
   if(!name||kuerzel.length<3||kuerzel.length>5){alert('Bitte Projektname und 3–5-stelliges Kürzel eingeben.');return;}
-  const proj={userId:currentUserId, id:Date.now(), name, kuerzel, color:state.selectedColor};
+  const proj={userId:currentUserId, id:Date.now(), name, kuerzel, color:state.selectedColor, order:state.projects.length};
   state.projects.push(proj);
   await saveProject(proj);
-  showView('home');
+  cancelNewProject();
+  renderManage();
 }
 
 // ── HOME ─────────────────────────────────────────────────────
@@ -693,8 +756,9 @@ function renderHome() {
   const grid=document.getElementById('projects-grid');
   const dc=document.getElementById('dropdown-container');
   grid.innerHTML=''; dc.innerHTML='';
-  document.getElementById('empty-state').style.display=state.projects.length===0?'block':'none';
-  state.projects.forEach(p=>{
+  const visibleProjects = state.projects.filter(p=>!p.archived).sort((a,b)=>(a.order||0)-(b.order||0));
+  document.getElementById('empty-state').style.display=visibleProjects.length===0?'block':'none';
+  visibleProjects.forEach(p=>{
     const total=totalForProject(p.id);
     const isActive=state.activeTracking&&state.activeTracking.projectId===p.id;
     const pal=getPal(p.color);
@@ -884,9 +948,14 @@ function sendReminder(pid){if(!state.activeTracking||state.activeTracking.projec
 function renderManage() {
   const list=document.getElementById('manage-list');list.innerHTML='';
   if(state.projects.length===0){list.innerHTML='<div class="empty-state">Keine Projekte vorhanden.</div>';return;}
-  state.projects.forEach(p=>{
+  const sortedProjects = [...state.projects].sort((a,b)=>(a.order||0)-(b.order||0));
+  sortedProjects.forEach(p=>{
     const pal=getPal(p.color);const div=document.createElement('div');div.className='proj-list-item';
-    div.innerHTML=`<div class="proj-dot" style="background:${pal.bg};color:${pal.text}">${p.kuerzel}</div><div class="proj-info"><div class="proj-info-name">${p.name}</div><div class="proj-info-kuerzel">${formatTime(totalForProject(p.id))} erfasst</div></div><div class="proj-actions"><button class="rename-btn" data-dbid="${p._id}" data-action="rename">✎ Umbenennen</button><button class="report-btn" data-dbid="${p._id}" data-pid="${p.id}" data-action="report">Bericht</button><button class="del-btn" data-dbid="${p._id}" data-pid="${p.id}" data-action="delete">Löschen</button></div>`;
+    const archivedLabel = p.archived ? '<span class="archived-badge">Archiviert</span>' : '';
+    div.innerHTML=`<span class="drag-handle">⠿</span><div class="proj-dot" style="background:${pal.bg};color:${pal.text}">${p.kuerzel}</div><div class="proj-info"><div class="proj-info-name">${p.name} ${archivedLabel}</div><div class="proj-info-kuerzel">${formatTime(totalForProject(p.id))} erfasst</div></div><div class="proj-actions"><button class="report-btn" data-dbid="${p._id}" data-pid="${p.id}" data-action="report">Bericht</button><button class="rename-btn" data-dbid="${p._id}" data-action="rename">Bearbeiten</button></div>`;
+    div.setAttribute('draggable','true');
+    div.dataset.dbid = p._id;
+    div.dataset.pid = p.id;
     list.appendChild(div);
   });
 }
@@ -898,6 +967,13 @@ window.openRenameModal = function(dbId) {
   renameProjectDbId = dbId;
   document.getElementById('rename-name').value = p.name;
   document.getElementById('rename-kuerzel').value = p.kuerzel;
+  document.getElementById('rename-notes').value = p.notes || '';
+  document.getElementById('rename-show-notes').checked = !!p.showNotes;
+  document.getElementById('rename-archived').checked = !!p.archived;
+  // Set color picker
+  document.querySelectorAll('#rename-color-picker .color-swatch').forEach(s => {
+    s.classList.toggle('selected', s.dataset.color === p.color);
+  });
   document.getElementById('rename-modal').classList.add('open');
 };
 
@@ -912,11 +988,17 @@ window.saveRename = async function() {
   if(!name||kuerzel.length<3||kuerzel.length>5){alert('Bitte Name und 3–5-stelliges Kürzel eingeben.');return;}
   const idx = state.projects.findIndex(x=>x._id===renameProjectDbId);
   if(idx<0) return;
+  const selColor = document.querySelector('#rename-color-picker .color-swatch.selected');
   state.projects[idx].name = name;
   state.projects[idx].kuerzel = kuerzel;
+  state.projects[idx].notes = document.getElementById('rename-notes').value.trim();
+  state.projects[idx].showNotes = document.getElementById('rename-show-notes').checked;
+  state.projects[idx].archived = document.getElementById('rename-archived').checked;
+  if(selColor) state.projects[idx].color = selColor.dataset.color;
   await saveProject(state.projects[idx]);
   closeRenameModal();
   renderManage();
+  renderHome();
 };
 
 window.openProjectReport = function(dbId, pid) {
@@ -932,11 +1014,12 @@ window.openProjectReport = function(dbId, pid) {
 window.deleteProject = async function(dbId, pid) {
   if(!confirm('Projekt und alle Einträge löschen?'))return;
   state.projects=state.projects.filter(p=>p._id!==dbId);
-  const entriesToDel=state.entries.filter(e=>e.projectId===pid);
-  state.entries=state.entries.filter(e=>e.projectId!==pid);
-  if(state.activeTracking&&state.activeTracking.projectId===pid){state.activeTracking=null;if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
+  const entriesToDel=state.entries.filter(e=>e.projectId===parseInt(pid)||e.projectId===pid);
+  state.entries=state.entries.filter(e=>e.projectId!==parseInt(pid)&&e.projectId!==pid);
+  if(state.activeTracking&&state.activeTracking.projectId===parseInt(pid)){state.activeTracking=null;if(timerInterval){clearInterval(timerInterval);timerInterval=null;}}
   await deleteProjectFromDB(dbId);
   await Promise.all(entriesToDel.map(e=>e._id?deleteEntryFromDB(e._id):Promise.resolve()));
+  closeRenameModal();
   renderManage();
 };
 
@@ -949,7 +1032,42 @@ document.getElementById('manage-list').addEventListener('click', function(e) {
   const pid = btn.dataset.pid ? parseInt(btn.dataset.pid) : null;
   if (action === 'rename') openRenameModal(dbId);
   if (action === 'report') openProjectReport(dbId, pid);
-  if (action === 'delete') deleteProject(dbId, pid);
+});
+
+// ── DRAG AND DROP ────────────────────────────────────────────
+let dragSrcDbId = null;
+document.getElementById('manage-list').addEventListener('dragstart', function(e) {
+  const item = e.target.closest('.proj-list-item');
+  if (!item) return;
+  dragSrcDbId = item.dataset.dbid;
+  setTimeout(() => item.classList.add('dragging'), 0);
+});
+document.getElementById('manage-list').addEventListener('dragend', function(e) {
+  const item = e.target.closest('.proj-list-item');
+  if (item) item.classList.remove('dragging');
+  document.querySelectorAll('.proj-list-item').forEach(i => i.classList.remove('drag-over'));
+});
+document.getElementById('manage-list').addEventListener('dragover', function(e) {
+  e.preventDefault();
+  const item = e.target.closest('.proj-list-item');
+  if (!item || item.dataset.dbid === dragSrcDbId) return;
+  document.querySelectorAll('.proj-list-item').forEach(i => i.classList.remove('drag-over'));
+  item.classList.add('drag-over');
+});
+document.getElementById('manage-list').addEventListener('drop', async function(e) {
+  e.preventDefault();
+  const targetItem = e.target.closest('.proj-list-item');
+  if (!targetItem || targetItem.dataset.dbid === dragSrcDbId) return;
+  targetItem.classList.remove('drag-over');
+  const srcIdx = state.projects.findIndex(p => p._id === dragSrcDbId);
+  const tgtIdx = state.projects.findIndex(p => p._id === targetItem.dataset.dbid);
+  if (srcIdx < 0 || tgtIdx < 0) return;
+  const [moved] = state.projects.splice(srcIdx, 1);
+  state.projects.splice(tgtIdx, 0, moved);
+  // Save new order
+  state.projects.forEach((p, i) => { p.order = i; saveProject(p); });
+  renderManage();
+  renderHome();
 });
 
 // ── REPORT ───────────────────────────────────────────────────
@@ -990,6 +1108,19 @@ function renderReport(fromManage) {
   renderProjectSelector('report-selector-sum');
   renderReportTable();
   renderSummary();
+  renderReportNotes();
+}
+
+function renderReportNotes() {
+  const existing = document.getElementById('report-notes-block');
+  if(existing) existing.remove();
+  const pid = state.reportProject;
+  const p = state.projects.find(x=>x.id===pid);
+  if(!p || !p.showNotes || !p.notes) return;
+  const div = document.createElement('div');
+  div.className = 'report-notes'; div.id = 'report-notes-block';
+  div.innerHTML = `<div class="report-notes-title">Hinweise</div><div class="report-notes-text">${p.notes}</div>`;
+  document.getElementById('report-table-view').appendChild(div);
 }
 
 window.setReportTab = function(tab) {
@@ -1111,6 +1242,7 @@ window.exportPDF = function() {
   const r = roundToFive(totalMs), h = Math.floor(r/60), m = r%60;
   const totalStr = (h>0?h+'h ':'')+m+' min';
 
+  const notesHtml = (p && p.showNotes && p.notes) ? `<div style="margin-top:18px"><div style="font-weight:bold;font-size:11pt;margin-bottom:6px;color:#555">Hinweise</div><div style="font-size:11pt;line-height:1.6;white-space:pre-wrap">${p.notes}</div></div>` : '';
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
     @page { size: A4 portrait; margin: 20mm 15mm 20mm 15mm; }
@@ -1135,6 +1267,7 @@ window.exportPDF = function() {
     <tbody>${rows}</tbody>
     <tfoot><tr class="total-row"><td colspan="6">Gesamt (gerundet 5 min)</td><td>${totalStr}</td></tr></tfoot>
   </table>
+  ${notesHtml}
   </body></html>`;
 
   const w = window.open('','_blank','width=800,height=600');
@@ -1160,6 +1293,7 @@ window.exportCSV = function() {
   entries.forEach(e=>{const mins=Math.floor(e.duration/60000);if(!e.exclude)total+=e.duration;csv+=`"${formatDate(e.start)}","${e.kategorie}","${e.taetigkeit||''}","${formatHHMM(e.start)}","${formatHHMM(e.end)}",${mins},"${e.exclude?'nicht berechnet':''}"
 `;});
   csv+=`\nGesamt (gerundet 5 min),,,,,${roundToFive(total)}\n`;
+  if(p && p.showNotes && p.notes) { csv+=`\nHinweise:\n"${p.notes.replace(/"/g,'""')}"\n`; }
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`zeiterfassung_${p?p.kuerzel:'export'}_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
 };
@@ -1172,6 +1306,16 @@ document.getElementById('rename-modal').addEventListener('click',function(e){
   if(!btn) return;
   if(btn.dataset.action==='rename-cancel') closeRenameModal();
   if(btn.dataset.action==='rename-save') saveRename();
+  if(btn.dataset.action==='rename-delete') {
+    const p = state.projects.find(x=>x._id===renameProjectDbId);
+    if(p) deleteProject(p._id, p.id);
+  }
+});
+// Color picker in rename modal
+document.getElementById('rename-color-picker').addEventListener('click', function(e) {
+  const s = e.target.closest('.color-swatch'); if(!s) return;
+  document.querySelectorAll('#rename-color-picker .color-swatch').forEach(x=>x.classList.remove('selected'));
+  s.classList.add('selected');
 });
 document.getElementById('color-picker').addEventListener('click',e=>{const s=e.target.closest('.color-swatch');if(!s)return;document.querySelectorAll('.color-swatch').forEach(x=>x.classList.remove('selected'));s.classList.add('selected');state.selectedColor=s.dataset.color;});
 document.getElementById('new-kuerzel').addEventListener('input',function(){this.value=this.value.toUpperCase().replace(/[^A-ZÄÖÜ0-9]/g,'');});
