@@ -385,7 +385,7 @@
   </div>
 
   <div class="bottom-nav">
-    <button class="nav-btn primary" id="nav-home" onclick="showView('home')">Start</button>
+    <button class="nav-btn primary" id="nav-home" onclick="showView('home')">Projekte</button>
     <button class="nav-btn" id="nav-manage" onclick="showView('manage')">Verwalten</button>
   </div>
 </div>
@@ -509,8 +509,8 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 
 // ── CONSTANTS ────────────────────────────────────────────────
-const KATEGORIEN = ['Planung','Ortstermine','Koordination','Organisation'];
-const KAT_COLORS = {'Planung':'#C0392B','Ortstermine':'#1A5276','Koordination':'#7D6608','Organisation':'#1E8449'};
+const KATEGORIEN = ['Planung','Ortstermine'];
+const KAT_COLORS = {'Planung':'#C0392B','Ortstermine':'#1A5276'};
 const PASTEL = [
   {bg:'#F5C2C2',text:'#7A3535'},{bg:'#FAE8A4',text:'#6B5200'},
   {bg:'#B8E8D4',text:'#1F5C43'},{bg:'#B8D4F0',text:'#1F3F6B'},{bg:'#F0B8E0',text:'#6B1F52'}
@@ -1036,36 +1036,66 @@ document.getElementById('manage-list').addEventListener('click', function(e) {
 
 // ── DRAG AND DROP ────────────────────────────────────────────
 let dragSrcDbId = null;
+let dragOverDbId = null;
+
+function getDragItems() {
+  return Array.from(document.querySelectorAll('#manage-list .proj-list-item'));
+}
+
 document.getElementById('manage-list').addEventListener('dragstart', function(e) {
   const item = e.target.closest('.proj-list-item');
   if (!item) return;
   dragSrcDbId = item.dataset.dbid;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragSrcDbId);
   setTimeout(() => item.classList.add('dragging'), 0);
 });
+
 document.getElementById('manage-list').addEventListener('dragend', function(e) {
-  const item = e.target.closest('.proj-list-item');
-  if (item) item.classList.remove('dragging');
-  document.querySelectorAll('.proj-list-item').forEach(i => i.classList.remove('drag-over'));
+  getDragItems().forEach(i => { i.classList.remove('dragging'); i.classList.remove('drag-over'); });
+  dragSrcDbId = null;
+  dragOverDbId = null;
 });
+
 document.getElementById('manage-list').addEventListener('dragover', function(e) {
   e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
   const item = e.target.closest('.proj-list-item');
   if (!item || item.dataset.dbid === dragSrcDbId) return;
-  document.querySelectorAll('.proj-list-item').forEach(i => i.classList.remove('drag-over'));
+  if (item.dataset.dbid === dragOverDbId) return;
+  dragOverDbId = item.dataset.dbid;
+  getDragItems().forEach(i => i.classList.remove('drag-over'));
   item.classList.add('drag-over');
 });
-document.getElementById('manage-list').addEventListener('drop', async function(e) {
+
+document.getElementById('manage-list').addEventListener('dragleave', function(e) {
+  const item = e.target.closest('.proj-list-item');
+  if (item) item.classList.remove('drag-over');
+});
+
+document.getElementById('manage-list').addEventListener('drop', function(e) {
   e.preventDefault();
+  getDragItems().forEach(i => { i.classList.remove('drag-over'); i.classList.remove('dragging'); });
+
   const targetItem = e.target.closest('.proj-list-item');
-  if (!targetItem || targetItem.dataset.dbid === dragSrcDbId) return;
-  targetItem.classList.remove('drag-over');
-  const srcIdx = state.projects.findIndex(p => p._id === dragSrcDbId);
-  const tgtIdx = state.projects.findIndex(p => p._id === targetItem.dataset.dbid);
+  if (!targetItem || !dragSrcDbId || targetItem.dataset.dbid === dragSrcDbId) return;
+
+  const sorted = [...state.projects].sort((a,b)=>(a.order||0)-(b.order||0));
+  const srcIdx = sorted.findIndex(p => p._id === dragSrcDbId);
+  const tgtIdx = sorted.findIndex(p => p._id === targetItem.dataset.dbid);
   if (srcIdx < 0 || tgtIdx < 0) return;
-  const [moved] = state.projects.splice(srcIdx, 1);
-  state.projects.splice(tgtIdx, 0, moved);
-  // Save new order
-  state.projects.forEach((p, i) => { p.order = i; saveProject(p); });
+
+  const [moved] = sorted.splice(srcIdx, 1);
+  sorted.splice(tgtIdx, 0, moved);
+
+  // Update order on state.projects
+  sorted.forEach((p, i) => {
+    const sp = state.projects.find(x => x._id === p._id);
+    if (sp) sp.order = i;
+  });
+
+  // Save all
+  state.projects.forEach(p => saveProject(p));
   renderManage();
   renderHome();
 });
