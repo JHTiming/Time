@@ -234,7 +234,7 @@
 
 
   <div class="view" id="view-manage">
-    <p class="section-title" id="manage-title">Verwaltung</p>
+    
     <div id="new-project-form" style="display:none">
       <div class="form-group">
         <label class="form-label">Projektname</label>
@@ -715,8 +715,10 @@ window.showView = function(name) {
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('primary'));
   const m={home:'nav-home',manage:'nav-manage'};
   if(m[name]) document.getElementById(m[name]).classList.add('primary');
+  const titles = {home:'Projekte', manage:'Verwaltung', report:'Bericht'};
+  document.querySelector('header h1').textContent = titles[name] || 'Projekte';
   if(name==='home') renderHome();
-  if(name==='manage') { renderManage(); }
+  if(name==='manage') renderManage();
   if(name==='report') renderReport();
 };
 
