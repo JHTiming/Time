@@ -102,6 +102,14 @@
   /* Archive badge */
   .archived-badge { font-size: 10px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 2px 7px; font-weight: 600; }
   /* Notes in report */
+  .billing-section { margin-bottom: 20px; }
+  .billing-header { display:flex; align-items:center; justify-content:space-between; padding: 8px 12px; border-radius: var(--radius-sm); margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+  .billing-header.billed { background: #f0f7f0; color: #2D6A4F; border: 1px solid #B8E8D4; }
+  .billing-header.current { background: #f0f4ff; color: #1B4F72; border: 1px solid #B8D4F0; }
+  .billing-header .billed-badge { background: #2D6A4F; color: #fff; border-radius: 10px; padding: 2px 8px; font-size: 10px; }
+  .billing-total-row td { font-weight: 700; background: #f9f9f9; border-top: 1px solid var(--border); font-size: 11px; }
+  .bill-now-btn { width:100%; padding:13px; background: #2D6A4F; color:#fff; border:none; border-radius: var(--radius-sm); font-family:'Syne',sans-serif; font-size:14px; font-weight:700; cursor:pointer; margin-bottom:12px; transition: opacity 0.15s; }
+  .bill-now-btn:active { opacity: 0.8; }
   .report-notes { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
   .report-notes-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
   .report-notes-text { font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
@@ -273,6 +281,7 @@
     <div id="report-table-view">
       <div class="project-selector" id="report-selector"></div>
       <button class="add-entry-btn" onclick="openAddModal()">+ Eintrag manuell hinzufügen</button>
+      <button class="bill-now-btn" id="bill-now-btn" onclick="closeBillingPeriod()">✓ Aktuellen Zeitraum als abgerechnet markieren</button>
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <button class="export-btn" style="margin-bottom:0" onclick="exportCSV()">⬇ CSV</button>
         <button class="export-btn" style="margin-bottom:0" onclick="exportPDF()">⬇ PDF</button>
@@ -309,6 +318,10 @@
       <div class="time-row">
         <div class="form-group" style="margin-bottom:0"><label class="form-label">Startzeit</label><input class="form-input" id="modal-start" type="time"></div>
         <div class="form-group" style="margin-bottom:0"><label class="form-label">Endzeit</label><input class="form-input" id="modal-end" type="time"></div>
+      </div>
+      <div class="form-group" id="modal-billing-group">
+        <label class="form-label">Abrechnungszeitraum</label>
+        <select class="form-input" id="modal-billing" style="font-size:13px"></select>
       </div>
       <div class="toggle-row">
         <div>
@@ -704,7 +717,12 @@ function formatTime(ms) { const h=Math.floor(ms/3.6e6),m=Math.floor((ms%3.6e6)/6
 function formatHHMM(ts) { return new Date(ts).toTimeString().slice(0,5); }
 function formatDate(ts) { return new Date(ts).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}); }
 function roundToFive(ms) { return Math.round(ms/60000/5)*5; }
-function totalForProject(pid) { return state.entries.filter(e=>e.projectId===pid).reduce((s,e)=>s+(e.duration||0),0); }
+function totalForProject(pid) {
+  const openPeriod = getNextOpenPeriod(pid);
+  return state.entries
+    .filter(e=>e.projectId===pid && (e.billingPeriod||1)===openPeriod && !e.exclude && !e.billed)
+    .reduce((s,e)=>s+(e.duration||0),0);
+}
 
 // ── NAV ──────────────────────────────────────────────────────
 function resetNavNew() { /* nav-new removed */ }
@@ -868,6 +886,7 @@ function pauseTracking(pid) {
   // 1. Capture segment data BEFORE clearing state
   const segEnd = Date.now();
   const segDuration = segEnd - state.activeTracking.startTime;
+  const currentPeriod = getNextOpenPeriod(pid);
   const entry = {
     userId: currentUserId,
     projectId: pid,
@@ -875,7 +894,8 @@ function pauseTracking(pid) {
     taetigkeit: state.activeTracking.taetigkeit,
     start: state.activeTracking.startTime,
     end: segEnd,
-    duration: segDuration
+    duration: segDuration,
+    billingPeriod: currentPeriod
   };
   const pausedInfo = {
     projectId: pid,
@@ -917,7 +937,8 @@ window.stopTracking = async function(pid, silent=false) {
   if(!state.activeTracking||state.activeTracking.projectId!==pid)return;
   const segEnd = Date.now();
   const duration = segEnd - state.activeTracking.startTime;
-  const entry={userId:currentUserId,projectId:pid,kategorie:state.activeTracking.kategorie,taetigkeit:state.activeTracking.taetigkeit,start:state.activeTracking.startTime,end:segEnd,duration};
+  const currentPeriod = getNextOpenPeriod(pid);
+  const entry={userId:currentUserId,projectId:pid,kategorie:state.activeTracking.kategorie,taetigkeit:state.activeTracking.taetigkeit,start:state.activeTracking.startTime,end:segEnd,duration,billingPeriod:currentPeriod};
   state.activeTracking=null;
   state.pausedTracking=null;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
@@ -1143,6 +1164,20 @@ function renderReport(fromManage) {
   renderReportNotes();
 }
 
+window.closeBillingPeriod = async function() {
+  const pid = state.reportProject; if(!pid) return;
+  const maxPeriod = getNextOpenPeriod(pid);
+  const openEntries = state.entries.filter(e=>e.projectId===pid && (e.billingPeriod||1)===maxPeriod && !e.billed);
+  if(openEntries.length===0){alert('Keine offenen Einträge im aktuellen Zeitraum.');return;}
+  if(!confirm(`${openEntries.length} Einträge als abgerechnet markieren und neuen Zeitraum starten?`))return;
+  const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  for(const e of openEntries){
+    e.billed=true; e.billedDate=today; e.billingPeriod=maxPeriod;
+    await saveEntry(e);
+  }
+  renderReport();
+};
+
 function renderReportNotes() {
   const existing = document.getElementById('report-notes-block');
   if(existing) existing.remove();
@@ -1162,29 +1197,89 @@ window.setReportTab = function(tab) {
   document.getElementById('report-summary-view').style.display=tab==='summary'?'block':'none';
 };
 
+function getMaxBillingPeriod(pid) {
+  const periods = state.entries.filter(e=>e.projectId===pid).map(e=>e.billingPeriod||1);
+  return periods.length ? Math.max(...periods) : 1;
+}
+
+function getNextOpenPeriod(pid) {
+  // Find the highest period that has unbilled entries, or create new one
+  const entries = state.entries.filter(e=>e.projectId===pid);
+  if(entries.length===0) return 1;
+  const max = Math.max(...entries.map(e=>e.billingPeriod||1));
+  // Check if max period is fully billed
+  const maxPeriodEntries = entries.filter(e=>(e.billingPeriod||1)===max);
+  const allBilled = maxPeriodEntries.length > 0 && maxPeriodEntries.every(e=>e.billed);
+  return allBilled ? max + 1 : max;
+}
+
 function renderReportTable() {
-  const tbody=document.getElementById('report-body');tbody.innerHTML='';
-  const pid=state.reportProject;
-  const entries=state.entries.filter(e=>e.projectId===pid).sort((a,b)=>a.start-b.start);
-  if(entries.length===0){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">Keine Einträge</td></tr>';return;}
-  let total=0;
-  entries.forEach(e=>{
-    const tr=document.createElement('tr');tr.className='data-row';
-    const kc=KAT_COLORS[e.kategorie]||'#888';
-    if(!e.exclude) total+=e.duration;
-    tr.innerHTML=`<td>${formatDate(e.start)}</td><td><span class="kat-badge" style="background:${kc}22;color:${kc}">${e.kategorie}</span></td><td style="font-family:'Syne',sans-serif;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${e.exclude?'opacity:0.4;text-decoration:line-through':''}">${e.taetigkeit||'–'}</td><td style="${e.exclude?'opacity:0.4':''}">${formatHHMM(e.start)}</td><td style="${e.exclude?'opacity:0.4':''}">${formatHHMM(e.end)}</td><td style="${e.exclude?'opacity:0.4':''}">${Math.floor(e.duration/60000)} min</td><td style="text-align:center">${e.exclude?'<span class="not-counted">✕</span>':''}</td><td><button class="edit-row-btn" onclick="openEditModal('${e._id}')">Bearbeiten</button></td>`;
-    tbody.appendChild(tr);
-  });
-  const r=roundToFive(total),h=Math.floor(r/60),m=r%60;
-  const tr=document.createElement('tr');tr.className='total-row';
-  tr.innerHTML=`<td colspan="7" style="font-size:11px">Gesamt (gerundet 5 min)</td><td>${h>0?h+'h ':'' }${m} min</td>`;
-  tbody.appendChild(tr);
+  const pid = state.reportProject;
+  const allEntries = state.entries.filter(e=>e.projectId===pid).sort((a,b)=>a.start-b.start);
+  const tableWrap = document.querySelector('.time-table-wrap');
+  tableWrap.innerHTML = '';
+
+  if(allEntries.length===0){
+    tableWrap.innerHTML='<div style="text-align:center;color:var(--muted);padding:24px;font-size:13px">Keine Einträge</div>';
+    return;
+  }
+
+  const maxPeriod = getMaxBillingPeriod(pid);
+  let openTotal = 0;
+
+  for(let period = 1; period <= maxPeriod; period++) {
+    const periodEntries = allEntries.filter(e=>(e.billingPeriod||1)===period);
+    if(periodEntries.length===0) continue;
+    const isBilled = periodEntries[0].billed === true;
+
+    // Section header
+    const header = document.createElement('div');
+    header.className = 'billing-header ' + (isBilled?'billed':'current');
+    const billedDate = isBilled ? (periodEntries[0].billedDate||'') : '';
+    header.innerHTML = isBilled
+      ? `<span>Abrechnung ${period} · abgeschlossen ${billedDate}</span><span class="billed-badge">✓ Abgerechnet</span>`
+      : `<span>Abrechnung ${period} · laufend</span>`;
+    tableWrap.appendChild(header);
+
+    // Table for this period
+    const table = document.createElement('table');
+    table.className = 'time-table';
+    table.style.marginBottom = '4px';
+    table.innerHTML = `<thead><tr><th>Datum</th><th>Kategorie</th><th>Tätigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th><th></th></tr></thead>`;
+    const tbody = document.createElement('tbody');
+
+    let periodTotal = 0;
+    periodEntries.forEach(e=>{
+      const tr=document.createElement('tr');tr.className='data-row';
+      const kc=KAT_COLORS[e.kategorie]||'#888';
+      if(!e.exclude && !isBilled) openTotal+=e.duration;
+      if(!e.exclude) periodTotal+=e.duration;
+      const strike=e.exclude?'opacity:0.4;text-decoration:line-through':'';
+      tr.innerHTML=`<td>${formatDate(e.start)}</td><td><span class="kat-badge" style="background:${kc}22;color:${kc}">${e.kategorie}</span></td><td style="font-family:'Syne',sans-serif;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${strike}">${e.taetigkeit||'–'}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.start)}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.end)}</td><td style="${strike?'opacity:0.4':''}">${Math.floor(e.duration/60000)} min</td><td style="text-align:center">${e.exclude?'<span class="not-counted">✕</span>':''}</td><td><button class="edit-row-btn" onclick="openEditModal('${e._id}')">Bearbeiten</button></td>`;
+      tbody.appendChild(tr);
+    });
+
+    // Period subtotal
+    const pr=roundToFive(periodTotal),ph=Math.floor(pr/60),pm=pr%60;
+    const subtr=document.createElement('tr');subtr.className='billing-total-row';
+    subtr.innerHTML=`<td colspan="7" style="font-size:11px">${isBilled?'Abgerechnet':'Zwischensumme'} (gerundet 5 min)</td><td>${ph>0?ph+'h ':'' }${pm} min</td>`;
+    tbody.appendChild(subtr);
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+  }
+
+  // Open total
+  const or=roundToFive(openTotal),oh=Math.floor(or/60),om=or%60;
+  const totalDiv=document.createElement('div');
+  totalDiv.style.cssText='background:var(--text);color:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-weight:700;font-size:13px';
+  totalDiv.innerHTML=`<span>Offen (noch nicht abgerechnet)</span><span style="font-family:'DM Mono',monospace">${oh>0?oh+'h ':'' }${om} min</span>`;
+  tableWrap.appendChild(totalDiv);
 }
 
 function renderSummary() {
   const pid=state.reportProject;
   const entries=state.entries.filter(e=>e.projectId===pid);
-  const totalMs=entries.filter(e=>!e.exclude).reduce((s,e)=>s+(e.duration||0),0);
+  const totalMs=entries.filter(e=>!e.exclude&&!e.billed).reduce((s,e)=>s+(e.duration||0),0);
   const r=roundToFive(totalMs),h=Math.floor(r/60),m=r%60;
   document.getElementById('summary-cards').innerHTML=`<div class="stat-card"><div class="stat-label">Gesamt (gerundet)</div><div class="stat-val">${h>0?h+'h ':'' }${m}m</div></div><div class="stat-card"><div class="stat-label">Einträge</div><div class="stat-val">${entries.length}</div></div>`;
   const byKat={};KATEGORIEN.forEach(k=>byKat[k]=0);entries.forEach(e=>{if(byKat[e.kategorie]!==undefined)byKat[e.kategorie]+=e.duration;});
@@ -1193,6 +1288,31 @@ function renderSummary() {
 }
 
 // ── MODAL ────────────────────────────────────────────────────
+function buildBillingSelect(pid, currentPeriod) {
+  const sel = document.getElementById('modal-billing');
+  sel.innerHTML='';
+  const resolvedPid = pid||state.reportProject;
+  const entries = state.entries.filter(e=>e.projectId===resolvedPid);
+  const max = entries.length ? Math.max(...entries.map(e=>e.billingPeriod||1)) : 1;
+  const openPeriod = getNextOpenPeriod(resolvedPid);
+
+  // Show all existing periods plus the open one
+  const totalPeriods = Math.max(max, openPeriod);
+  for(let i=1;i<=totalPeriods;i++){
+    const periodEntries = entries.filter(e=>(e.billingPeriod||1)===i);
+    const isBilled = periodEntries.length>0 && periodEntries.every(e=>e.billed);
+    const isOpen = i===openPeriod;
+    const opt=document.createElement('option');
+    opt.value=i;
+    opt.textContent='Abrechnung '+i+(isBilled?' (abgerechnet)':' (laufend)');
+    if(i===currentPeriod) opt.selected=true;
+    sel.appendChild(opt);
+  }
+
+  // If no period selected, default to open period
+  if(!currentPeriod) sel.value = openPeriod;
+}
+
 function buildModalKatGrid(sel) {
   const g=document.getElementById('modal-kat-grid');g.innerHTML='';
   KATEGORIEN.forEach((k,i)=>{const b=document.createElement('button');b.className='modal-kat-btn'+(k===sel?' selected':'');b.textContent=(i+1)+'. '+k;b.onclick=()=>{g.querySelectorAll('.modal-kat-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');};g.appendChild(b);});
@@ -1206,6 +1326,7 @@ window.openAddModal = function() {
   document.getElementById('modal-taetigkeit').value='';
   document.getElementById('modal-start').value='09:00';document.getElementById('modal-end').value='10:00';
   document.getElementById('modal-exclude').checked=false;
+  buildBillingSelect(state.reportProject, getNextOpenPeriod(state.reportProject));
   buildModalKatGrid('Planung');document.getElementById('edit-modal').classList.add('open');
 };
 
@@ -1218,6 +1339,7 @@ window.openEditModal = function(dbId) {
   document.getElementById('modal-start').value=new Date(e.start).toTimeString().slice(0,5);
   document.getElementById('modal-end').value=new Date(e.end).toTimeString().slice(0,5);
   document.getElementById('modal-exclude').checked = !!e.exclude;
+  buildBillingSelect(e.projectId, e.billingPeriod||1);
   buildModalKatGrid(e.kategorie);document.getElementById('edit-modal').classList.add('open');
 };
 
@@ -1238,10 +1360,12 @@ window.saveModal = async function() {
   if(modalEntryId!==null){
     const idx=state.entries.findIndex(x=>x._id===modalEntryId);
     const exclude=document.getElementById('modal-exclude').checked;
-    if(idx>=0){state.entries[idx]={...state.entries[idx],kategorie:kat,taetigkeit,start:startTs,end:endTs,duration,exclude};await saveEntry(state.entries[idx]);}
+    const billingPeriod=parseInt(document.getElementById('modal-billing').value)||1;
+    if(idx>=0){state.entries[idx]={...state.entries[idx],kategorie:kat,taetigkeit,start:startTs,end:endTs,duration,exclude,billingPeriod};await saveEntry(state.entries[idx]);}
   } else {
     const exclude=document.getElementById('modal-exclude').checked;
-    const entry={userId:currentUserId,projectId:state.reportProject,kategorie:kat,taetigkeit,start:startTs,end:endTs,duration,exclude};
+    const billingPeriod=parseInt(document.getElementById('modal-billing').value)||getNextOpenPeriod(state.reportProject);
+    const entry={userId:currentUserId,projectId:state.reportProject,kategorie:kat,taetigkeit,start:startTs,end:endTs,duration,exclude,billingPeriod};
     await saveEntry(entry);
   }
   closeModal();renderReport();
@@ -1252,41 +1376,61 @@ window.exportPDF = function() {
   const p = state.projects.find(x=>x.id===pid);
   const entries = state.entries.filter(e=>e.projectId===pid).sort((a,b)=>a.start-b.start);
   const today = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const maxPeriod = getMaxBillingPeriod(pid);
+  const openPeriod = getNextOpenPeriod(pid);
+  let openTotal = 0;
+  let allSectionsHtml = '';
 
-  let totalMs = 0;
-  let rows = '';
-  entries.forEach((e,i) => {
-    const mins = Math.floor(e.duration/60000);
-    if(!e.exclude) totalMs += e.duration;
-    const bg = i%2===0 ? '#f9f9f9' : '#ffffff';
-    const strike = e.exclude ? 'text-decoration:line-through;opacity:0.5;' : '';
-    rows += `<tr style="background:${bg}">
-      <td style="${strike}">${formatDate(e.start)}</td>
-      <td style="${strike}">${e.kategorie}</td>
-      <td style="${strike}">${e.taetigkeit||'–'}</td>
-      <td style="${strike}">${formatHHMM(e.start)}</td>
-      <td style="${strike}">${formatHHMM(e.end)}</td>
-      <td style="${strike}">${mins} min</td>
-      <td style="text-align:center;color:#e55;font-weight:700">${e.exclude?'✕':''}</td>
-    </tr>`;
-  });
+  for(let period=1; period<=Math.max(maxPeriod,openPeriod); period++){
+    const pe = entries.filter(e=>(e.billingPeriod||1)===period);
+    if(pe.length===0) continue;
+    const isBilled = pe.every(e=>e.billed);
+    const billedDate = isBilled ? (pe[0].billedDate||'') : '';
+    const headerColor = isBilled ? '#e8f5e9' : '#e8f0fe';
+    const headerText = isBilled
+      ? `Abrechnung ${period} &middot; abgeschlossen ${billedDate} &#10003;`
+      : `Abrechnung ${period} &middot; laufend`;
+    let periodTotal = 0;
+    let rowsHtml = '';
+    pe.forEach((e,i) => {
+      const mins = Math.floor(e.duration/60000);
+      if(!e.exclude) periodTotal += e.duration;
+      if(!e.exclude && !isBilled) openTotal += e.duration;
+      const bg = i%2===0 ? '#f9f9f9' : '#fff';
+      const strike = e.exclude ? 'text-decoration:line-through;opacity:0.5;' : '';
+      rowsHtml += `<tr style="background:${bg}">
+        <td style="${strike}">${formatDate(e.start)}</td>
+        <td style="${strike}">${e.kategorie}</td>
+        <td style="${strike}">${e.taetigkeit||'&ndash;'}</td>
+        <td style="${strike}">${formatHHMM(e.start)}</td>
+        <td style="${strike}">${formatHHMM(e.end)}</td>
+        <td style="${strike}">${mins} min</td>
+        <td style="text-align:center;color:#c00;font-weight:700">${e.exclude?'&#10005;':''}</td>
+      </tr>`;
+    });
+    const pr=roundToFive(periodTotal), ph=Math.floor(pr/60), pm=pr%60;
+    allSectionsHtml += `
+      <tr><td colspan="7" style="background:${headerColor};font-weight:bold;padding:7px 8px;border-top:2px solid #bbb;font-size:10pt">${headerText}</td></tr>
+      ${rowsHtml}
+      <tr style="background:#f0f0f0"><td colspan="6" style="font-weight:bold;padding:5px 8px;font-size:10pt">${isBilled?'Abgerechnet':'Zwischensumme'} (gerundet 5 min)</td><td style="font-weight:bold;padding:5px 8px">${ph>0?ph+'h ':'' }${pm} min</td></tr>`;
+  }
 
-  const r = roundToFive(totalMs), h = Math.floor(r/60), m = r%60;
-  const totalStr = (h>0?h+'h ':'')+m+' min';
+  const or=roundToFive(openTotal), oh=Math.floor(or/60), om=or%60;
+  const notesHtml = (p && p.showNotes && p.notes)
+    ? `<div style="margin-top:18px"><div style="font-weight:bold;font-size:11pt;margin-bottom:6px;color:#555">Hinweise</div><div style="font-size:11pt;line-height:1.6;white-space:pre-wrap">${p.notes}</div></div>`
+    : '';
 
-  const notesHtml = (p && p.showNotes && p.notes) ? `<div style="margin-top:18px"><div style="font-weight:bold;font-size:11pt;margin-bottom:6px;color:#555">Hinweise</div><div style="font-size:11pt;line-height:1.6;white-space:pre-wrap">${p.notes}</div></div>` : '';
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
     @page { size: A4 portrait; margin: 20mm 15mm 20mm 15mm; }
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; }
-    .header { display:flex; justify-content:space-between; font-size:10pt; font-weight:normal; border-bottom:1px solid #ccc; padding-bottom:6px; margin-bottom:14px; color:#444; }
+    .header { display:flex; justify-content:space-between; font-size:10pt; border-bottom:1px solid #ccc; padding-bottom:6px; margin-bottom:14px; color:#444; }
     .project-title { font-size:12pt; font-weight:bold; margin-bottom:14px; }
     table { width:100%; border-collapse:collapse; }
-    thead tr { background:#e8e8e8; }
-    th { font-size:11pt; font-weight:bold; color:#555; padding:6px 8px; text-align:left; border-bottom:2px solid #ccc; }
+    th { font-size:11pt; font-weight:bold; color:#555; padding:6px 8px; text-align:left; background:#e8e8e8; border-bottom:2px solid #ccc; }
     td { padding:5px 8px; border-bottom:1px solid #eee; font-size:11pt; }
-    .total-row td { font-weight:bold; border-top:2px solid #ccc; background:#f0f0f0; }
+    .open-total td { font-weight:bold; border-top:3px solid #333; background:#1a1916; color:#fff; padding:7px 8px; }
   </style></head><body>
   <div class="header">
     <span>Architekturbüro Hormann</span>
@@ -1295,9 +1439,9 @@ window.exportPDF = function() {
   </div>
   <div class="project-title">${p?p.kuerzel:''} &nbsp;&nbsp; ${p?p.name:''}</div>
   <table>
-    <thead><tr><th>Datum</th><th>Kategorie</th><th>Tätigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th></tr></thead>
-    <tbody>${rows}</tbody>
-    <tfoot><tr class="total-row"><td colspan="6">Gesamt (gerundet 5 min)</td><td>${totalStr}</td></tr></tfoot>
+    <thead><tr><th>Datum</th><th>Kategorie</th><th>T&auml;tigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th></tr></thead>
+    <tbody>${allSectionsHtml}</tbody>
+    <tfoot><tr class="open-total"><td colspan="6">Offen / noch nicht abgerechnet (gerundet 5 min)</td><td>${oh>0?oh+'h ':'' }${om} min</td></tr></tfoot>
   </table>
   ${notesHtml}
   </body></html>`;
@@ -1320,14 +1464,50 @@ window.exportCSV = function() {
   const pid=state.reportProject;if(!pid)return;
   const p=state.projects.find(x=>x.id===pid);
   const entries=state.entries.filter(e=>e.projectId===pid).sort((a,b)=>a.start-b.start);
-  let csv=`Projekt: ${p?p.name:''}\n`+'Datum,Kategorie,Tätigkeit,Start,Ende,Dauer (min)\n';
-  let total=0;
-  entries.forEach(e=>{const mins=Math.floor(e.duration/60000);if(!e.exclude)total+=e.duration;csv+=`"${formatDate(e.start)}","${e.kategorie}","${e.taetigkeit||''}","${formatHHMM(e.start)}","${formatHHMM(e.end)}",${mins},"${e.exclude?'nicht berechnet':''}"
-`;});
-  csv+=`\nGesamt (gerundet 5 min),,,,,${roundToFive(total)}\n`;
-  if(p && p.showNotes && p.notes) { csv+=`\nHinweise:\n"${p.notes.replace(/"/g,'""')}"\n`; }
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`zeiterfassung_${p?p.kuerzel:'export'}_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
+  const maxPeriod=getMaxBillingPeriod(pid);
+  const openPeriod=getNextOpenPeriod(pid);
+  let csv=`Projekt: ${p?p.name:''}
+Kürzel: ${p?p.kuerzel:''}
+
+`;
+  let openTotal=0;
+
+  for(let period=1;period<=Math.max(maxPeriod,openPeriod);period++){
+    const pe=entries.filter(e=>(e.billingPeriod||1)===period);
+    if(pe.length===0) continue;
+    const isBilled=pe.every(e=>e.billed);
+    const billedDate=isBilled?(pe[0].billedDate||''):'';
+    csv+=isBilled
+      ? `Abrechnung ${period} - abgeschlossen ${billedDate}\n`
+      : `Abrechnung ${period} - laufend\n`;
+    csv+="Datum,Kategorie,Taetigkeit,Start,Ende,Dauer (min),Nicht berechnet\n";
+    let periodTotal=0;
+    pe.forEach(e=>{
+      const mins=Math.floor(e.duration/60000);
+      if(!e.exclude) periodTotal+=e.duration;
+      if(!e.exclude&&!isBilled) openTotal+=e.duration;
+      csv+=`"${formatDate(e.start)}","${e.kategorie}","${e.taetigkeit||''}","${formatHHMM(e.start)}","${formatHHMM(e.end)}",${mins},"${e.exclude?'nicht berechnet':''}"
+`;
+    });
+    const pr=roundToFive(periodTotal),ph=Math.floor(pr/60),pm2=pr%60;
+    csv+=`${isBilled?'Abgerechnet':'Zwischensumme'},,,,,(gerundet 5 min),${ph>0?ph+'h ':'' }${pm2} min
+
+`;
+  }
+
+  const or=roundToFive(openTotal),oh=Math.floor(or/60),om=or%60;
+  csv+=`Offen / noch nicht abgerechnet (gerundet 5 min),,,,,${oh>0?oh+'h ':'' }${om} min
+`;
+  if(p&&p.showNotes&&p.notes){csv+=`
+Hinweise:
+"${p.notes.replace(/"/g,'""')}"
+`;}
+
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download=`zeiterfassung_${p?p.kuerzel:'export'}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();URL.revokeObjectURL(url);
 };
 
 // ── INIT ─────────────────────────────────────────────────────
@@ -1351,6 +1531,14 @@ document.getElementById('rename-color-picker').addEventListener('click', functio
 });
 document.getElementById('color-picker').addEventListener('click',e=>{const s=e.target.closest('.color-swatch');if(!s)return;document.querySelectorAll('.color-swatch').forEach(x=>x.classList.remove('selected'));s.classList.add('selected');state.selectedColor=s.dataset.color;});
 document.getElementById('new-kuerzel').addEventListener('input',function(){this.value=this.value.toUpperCase().replace(/[^A-ZÄÖÜ0-9]/g,'');});
+
+// Enter key starts tracking from taetigkeit input
+document.addEventListener('keydown', function(e) {
+  if(e.key !== 'Enter') return;
+  // Find visible start button
+  const startBtn = document.querySelector('.start-btn:not([style*="display: none"]):not([style*="display:none"])');
+  if(startBtn) { e.preventDefault(); startBtn.click(); }
+});
 document.getElementById('rename-kuerzel').addEventListener('input',function(){this.value=this.value.toUpperCase().replace(/[^A-ZÄÖÜ0-9]/g,'');});
 window.logout = logout;
 window.startApp = startApp;
