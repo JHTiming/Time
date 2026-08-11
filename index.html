@@ -334,9 +334,9 @@
         </label>
       </div>
       <div class="modal-footer">
-        <button onclick="closeModal()">Abbrechen</button>
-        <button class="btn-delete" id="modal-delete-btn" onclick="deleteEntry()">Löschen</button>
-        <button class="btn-save" onclick="saveModal()">Speichern</button>
+        <button data-action="modal-cancel">Abbrechen</button>
+        <button class="btn-delete" id="modal-delete-btn" data-action="modal-delete">Löschen</button>
+        <button class="btn-save" data-action="modal-save">Speichern</button>
       </div>
     </div>
   </div>
@@ -1255,7 +1255,7 @@ function renderReportTable() {
       if(!e.exclude && !isBilled) openTotal+=e.duration;
       if(!e.exclude) periodTotal+=e.duration;
       const strike=e.exclude?'opacity:0.4;text-decoration:line-through':'';
-      tr.innerHTML=`<td>${formatDate(e.start)}</td><td><span class="kat-badge" style="background:${kc}22;color:${kc}">${e.kategorie}</span></td><td style="font-family:'Syne',sans-serif;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${strike}">${e.taetigkeit||'–'}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.start)}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.end)}</td><td style="${strike?'opacity:0.4':''}">${Math.floor(e.duration/60000)} min</td><td style="text-align:center">${e.exclude?'<span class="not-counted">✕</span>':''}</td><td><button class="edit-row-btn" onclick="openEditModal('${e._id}')">Bearbeiten</button></td>`;
+      tr.innerHTML=`<td>${formatDate(e.start)}</td><td><span class="kat-badge" style="background:${kc}22;color:${kc}">${e.kategorie}</span></td><td style="font-family:'Syne',sans-serif;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${strike}">${e.taetigkeit||'–'}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.start)}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.end)}</td><td style="${strike?'opacity:0.4':''}">${Math.floor(e.duration/60000)} min</td><td style="text-align:center">${e.exclude?'<span class="not-counted">✕</span>':''}</td><td><button class="edit-row-btn" data-editid="${e._id}">Bearbeiten</button></td>`;
       tbody.appendChild(tr);
     });
 
@@ -1511,7 +1511,23 @@ Hinweise:
 };
 
 // ── INIT ─────────────────────────────────────────────────────
-document.getElementById('edit-modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('edit-modal').addEventListener('click',function(e){
+  if(e.target===this){closeModal();return;}
+  const btn=e.target.closest('[data-action]');
+  if(!btn)return;
+  if(btn.dataset.action==='modal-cancel') closeModal();
+  if(btn.dataset.action==='modal-save') saveModal();
+  if(btn.dataset.action==='modal-delete') deleteEntry();
+});
+// Event delegation for edit buttons in report table
+document.querySelector('.time-table-wrap').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-editid]');
+  if(!btn) return;
+  const id = btn.dataset.editid;
+  if(id && id !== 'undefined') openEditModal(id);
+  else alert('Eintrag kann nicht bearbeitet werden – ID fehlt. Bitte Seite neu laden.');
+});
+
 document.getElementById('rename-modal').addEventListener('click',function(e){
   if(e.target===this) { closeRenameModal(); return; }
   const btn = e.target.closest('[data-action]');
