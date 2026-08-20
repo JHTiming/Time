@@ -12,7 +12,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 0 0 120px; }
-  header { padding: 28px 20px 16px; display: flex; align-items: baseline; justify-content: space-between; }
+  header { padding: 28px 70px 16px 20px; display: flex; align-items: baseline; justify-content: space-between; }
   header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
   header span { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
 
@@ -65,10 +65,19 @@
   .start-btn { display: block; width: calc(100% - 24px); margin: 0 12px 14px; padding: 13px; background: var(--text); color: var(--bg); border: none; border-radius: var(--radius-sm); font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
   .start-btn:active { opacity: 0.8; }
 
-  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; padding: 10px 16px 20px; gap: 8px; }
-  .nav-btn { flex: 1; padding: 11px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: transparent; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; transition: all 0.15s; }
-  .nav-btn:hover { background: var(--bg); }
-  .nav-btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  /* Hamburger */
+  #hamburger-btn { position:fixed; top:20px; right:20px; width:40px; height:40px; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-sm); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; cursor:pointer; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+  #hamburger-btn span { display:block; width:18px; height:2px; background:var(--text); border-radius:2px; transition:all 0.2s; }
+  #hamburger-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.3); z-index:201; }
+  #hamburger-overlay.open { display:block; }
+  #hamburger-menu { display:none; position:fixed; top:68px; right:16px; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:8px 0; z-index:202; min-width:160px; box-shadow:0 4px 24px rgba(0,0,0,0.12); }
+  #hamburger-menu.open { display:block; }
+  .ham-item { padding:12px 20px; font-size:14px; font-weight:600; font-family:'Syne',sans-serif; cursor:pointer; transition:background 0.15s; }
+  .ham-item:hover { background:var(--bg); }
+  .ham-small { font-size:12px; color:var(--muted); font-weight:400; }
+  .ham-divider { border-top:1px solid var(--border); margin:6px 0; }
+  /* Remove old bottom nav space */
+  body { padding-bottom: 20px; }
 
   .view { display: none; padding: 0 16px; }
   .view.active { display: block; }
@@ -123,9 +132,7 @@
   .modal-footer button { flex: 1; padding: 11px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: var(--text); transition: all 0.15s; }
   .modal-footer .btn-save { background: var(--text); color: var(--bg); border-color: var(--text); }
   .modal-footer .btn-delete { border-color: #e55; color: #e55; }
-  .modal-kat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-  .modal-kat-btn { padding: 9px 10px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--bg); font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; text-align: left; transition: all 0.15s; }
-  .modal-kat-btn.selected { background: var(--text); color: var(--bg); border-color: var(--text); }
+
   .time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
   .proj-list-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 8px; }
@@ -215,7 +222,6 @@
     <h1>Projekte</h1>
     <div style="display:flex;align-items:center;gap:10px">
       <span id="current-date"></span>
-      <button class="logout-btn" onclick="logout()">Abmelden</button>
     </div>
   </header>
 
@@ -286,12 +292,7 @@
         <button class="export-btn" style="margin-bottom:0" onclick="exportCSV()">⬇ CSV</button>
         <button class="export-btn" style="margin-bottom:0" onclick="exportPDF()">⬇ PDF</button>
       </div>
-      <div class="time-table-wrap">
-        <table class="time-table">
-          <thead><tr><th>Datum</th><th>Kategorie</th><th>Tätigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th><th></th></tr></thead>
-          <tbody id="report-body"></tbody>
-        </table>
-      </div>
+      <div class="time-table-wrap" id="report-table-inner"></div>
     </div>
     <div id="report-summary-view" style="display:none">
       <div class="project-selector" id="report-selector-sum"></div>
@@ -307,10 +308,7 @@
         <label class="form-label">Datum</label>
         <input class="form-input" id="modal-date" type="date">
       </div>
-      <div class="form-group">
-        <label class="form-label">Kategorie</label>
-        <div class="modal-kat-grid" id="modal-kat-grid"></div>
-      </div>
+
       <div class="form-group">
         <label class="form-label">Tätigkeit</label>
         <input class="form-input" id="modal-taetigkeit" type="text" placeholder="Kurze Beschreibung">
@@ -319,6 +317,7 @@
         <div class="form-group" style="margin-bottom:0"><label class="form-label">Startzeit</label><input class="form-input" id="modal-start" type="time"></div>
         <div class="form-group" style="margin-bottom:0"><label class="form-label">Endzeit</label><input class="form-input" id="modal-end" type="time"></div>
       </div>
+      <div id="modal-kat-grid" style="display:none"></div>
       <div class="form-group" id="modal-billing-group">
         <label class="form-label">Abrechnungszeitraum</label>
         <select class="form-input" id="modal-billing" style="font-size:13px"></select>
@@ -337,6 +336,35 @@
         <button data-action="modal-cancel">Abbrechen</button>
         <button class="btn-delete" id="modal-delete-btn" data-action="modal-delete">Löschen</button>
         <button class="btn-save" data-action="modal-save">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Tracking Control Modal -->
+  <div class="modal-overlay" id="tracking-control-modal">
+    <div class="modal-box">
+      <div class="modal-title" id="tracking-control-title">Erfassung</div>
+      <div id="tracking-control-subtitle" style="font-size:13px;color:var(--muted);margin-bottom:18px"></div>
+      <div class="modal-footer" style="flex-direction:column;gap:8px">
+        <button class="btn-save" id="tracking-pause-btn">⏸ Pausieren</button>
+        <button id="tracking-stop-btn">■ Stoppen</button>
+        <button data-action="tracking-cancel">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Action Modal -->
+  <div class="modal-overlay" id="project-action-modal">
+    <div class="modal-box">
+      <div class="modal-title" id="pam-title">Projekt</div>
+      <div class="form-group">
+        <label class="form-label">Tätigkeit</label>
+        <input class="form-input" id="pam-taetigkeit" type="text" placeholder="Was möchtest du erfassen?">
+      </div>
+      <div class="modal-footer" style="flex-direction:column;gap:8px">
+        <button class="btn-save" id="pam-start-btn">▶ Erfassung starten</button>
+        <button id="pam-add-btn">＋ Manuell eintragen</button>
+        <button data-action="pam-cancel">Abbrechen</button>
       </div>
     </div>
   </div>
@@ -397,9 +425,16 @@
     </div>
   </div>
 
-  <div class="bottom-nav">
-    <button class="nav-btn primary" id="nav-home" onclick="showView('home')">Projekte</button>
-    <button class="nav-btn" id="nav-manage" onclick="showView('manage')">Verwalten</button>
+  <!-- Hamburger Menu -->
+  <div id="hamburger-btn" onclick="toggleHamburger()">
+    <span></span><span></span><span></span>
+  </div>
+  <div id="hamburger-overlay" onclick="closeHamburger()"></div>
+  <div id="hamburger-menu">
+    <div class="ham-item" onclick="closeHamburger();showView('home')">Projekte</div>
+    <div class="ham-item" onclick="closeHamburger();showView('manage')">Verwalten</div>
+    <div class="ham-divider"></div>
+    <div class="ham-item ham-small" onclick="closeHamburger();logout()">Abmelden</div>
   </div>
 </div>
 
@@ -501,6 +536,40 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
+
+  <!-- Pause/Resume Modal -->
+  <div class="modal-overlay" id="pause-modal">
+    <div class="modal-box">
+      <div class="modal-title" id="pause-modal-title">Erfassung läuft</div>
+      <div class="sync-bar" style="padding:0 0 12px 0;margin-bottom:0">
+        <div class="sync-dot syncing"></div>
+        <span id="pause-modal-timer" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)"></span>
+      </div>
+      <div id="pause-modal-taetigkeit" style="font-size:13px;color:var(--muted);margin-bottom:16px;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)"></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button id="pause-modal-pause-btn" style="display:block;width:100%;padding:13px;background:transparent;color:var(--text);border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer">⏸ Pausieren</button>
+        <button id="pause-modal-stop-btn" style="display:block;width:100%;padding:13px;background:#e55;color:#fff;border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer">⏹ Stoppen</button>
+      </div>
+      <div style="margin-top:12px;text-align:center">
+        <button onclick="closePauseModal()" style="background:transparent;border:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:'Syne',sans-serif">Weiter erfassen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resume Modal -->
+  <div class="modal-overlay" id="resume-modal">
+    <div class="modal-box">
+      <div class="modal-title" id="resume-modal-title">Erfassung pausiert</div>
+      <div id="resume-modal-taetigkeit" style="font-size:13px;color:var(--muted);margin-bottom:16px;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)"></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button id="resume-modal-resume-btn" style="display:block;width:100%;padding:13px;background:var(--text);color:var(--bg);border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer">▶ Weiter erfassen</button>
+        <button id="resume-modal-stop-btn" style="display:block;width:100%;padding:13px;background:#e55;color:#fff;border:none;border-radius:var(--radius-sm);font-family:'Syne',sans-serif;font-size:14px;font-weight:600;cursor:pointer">⏹ Endgültig stoppen</button>
+      </div>
+      <div style="margin-top:12px;text-align:center">
+        <button onclick="closeResumeModal()" style="background:transparent;border:none;font-size:13px;color:var(--muted);cursor:pointer;font-family:'Syne',sans-serif">Abbrechen</button>
+      </div>
+    </div>
+  </div>
 
 <!-- Firebase compat (classic CDN, no module needed) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -727,12 +796,20 @@ function totalForProject(pid) {
 // ── NAV ──────────────────────────────────────────────────────
 function resetNavNew() { /* nav-new removed */ }
 
+function toggleHamburger() {
+  document.getElementById('hamburger-menu').classList.toggle('open');
+  document.getElementById('hamburger-overlay').classList.toggle('open');
+}
+function closeHamburger() {
+  document.getElementById('hamburger-menu').classList.remove('open');
+  document.getElementById('hamburger-overlay').classList.remove('open');
+}
+window.toggleHamburger = toggleHamburger;
+window.closeHamburger = closeHamburger;
+
 window.showView = function(name) {
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('primary'));
-  const m={home:'nav-home',manage:'nav-manage'};
-  if(m[name]) document.getElementById(m[name]).classList.add('primary');
   const titles = {home:'Projekte', manage:'Verwaltung', report:'Bericht'};
   document.querySelector('header h1').textContent = titles[name] || 'Projekte';
   if(name==='home') renderHome();
@@ -788,7 +865,7 @@ function renderHome() {
     const isPaused = state.pausedTracking && state.pausedTracking.projectId === p.id;
     const elapsed = isActive ? Date.now()-state.activeTracking.startTime : 0;
     card.innerHTML=`<div class="card-main" style="background:${pal.bg}"><div class="card-kuerzel" style="color:${pal.text}">${p.kuerzel}</div><div class="card-meta"><div class="card-name" style="color:${pal.text}99">${p.name}</div><div class="card-total" style="color:${pal.text}" id="card-total-${p.id}">${formatTime(total)}</div></div></div>${isActive ? `<div class="timer-bar visible" id="timer-bar-${p.id}" style="background:${pal.bg}cc"><div class="timer-dot" style="background:${pal.text}"></div><span id="timer-display-${p.id}" style="color:${pal.text}">${formatTime(elapsed)}</span></div>` : ''}${isPaused ? `<div class="paused-bar visible" style="background:${pal.bg}cc;color:${pal.text}">⏸ Pausiert</div>` : ''}`;
-    card.onclick = isActive ? ()=>showPauseMenu(p.id) : (isPaused ? ()=>showResumeMenu(p.id) : ()=>toggleDropdown(p.id));
+    card.onclick = isActive ? ()=>showPauseMenu(p.id) : (isPaused ? ()=>showResumeMenu(p.id) : ()=>openProjectModal(p.id));
     grid.appendChild(card);
     const drop=document.createElement('div');
     drop.className='dropdown'; drop.id='drop-'+p.id;
@@ -797,10 +874,7 @@ function renderHome() {
   updateActiveIndicator();
 }
 
-function buildDropdown(p) {
-  const kats=KATEGORIEN.map((k,i)=>`<button class="kat-btn" onclick="selectKat(${p.id},'${k}',this)">${i+1}. ${k}</button>`).join('');
-  return `<div class="dropdown-header">${p.name}</div><div class="kategorie-list">${kats}</div><div class="taetigkeit-wrap" id="tat-wrap-${p.id}"><input class="taetigkeit-input" id="tat-input-${p.id}" type="text" placeholder="Kurze Beschreibung…"></div><button class="start-btn" id="start-btn-${p.id}" onclick="startTracking(${p.id})" style="display:none">▶ Erfassung starten</button>`;
-}
+function buildDropdown(p) { return ''; } // replaced by modal
 
 let openDropId=null, selectedKat={};
 
@@ -846,32 +920,33 @@ function startTimerUI(pid) {
 }
 
 function showPauseMenu(pid) {
-  const container = document.getElementById('pause-menu-container');
-  container.innerHTML = '';
   const p = state.projects.find(x=>x.id===pid);
-  const div = document.createElement('div');
-  div.className = 'pause-menu open';
-  div.id = 'pause-menu-'+pid;
-  div.innerHTML = `<div class="pause-menu-title">${p.name} — Was möchtest du tun?</div><div class="pause-menu-btns"><button class="pause-action-btn" id="btn-pause-${pid}">⏸ Pausieren</button><button class="pause-action-btn stop" id="btn-stop-${pid}">⏹ Stoppen</button></div>`;
-  container.appendChild(div);
-  div.onclick = (e) => e.stopPropagation();
-  document.getElementById('btn-pause-'+pid).onclick = (e) => { e.stopPropagation(); pauseTracking(pid); };
-  document.getElementById('btn-stop-'+pid).onclick = (e) => { e.stopPropagation(); container.innerHTML=''; stopTracking(pid); };
+  const t = state.activeTracking;
+  document.getElementById('pause-modal-title').textContent = (p ? p.kuerzel + ' – ' + p.name : 'Erfassung');
+  document.getElementById('pause-modal-taetigkeit').textContent = t ? (t.taetigkeit || '–') : '–';
+  document.getElementById('pause-modal-timer').textContent = t ? formatTime(Date.now() - t.startTime) : '';
+  document.getElementById('pause-modal-pause-btn').onclick = () => { closePauseModal(); pauseTracking(pid); };
+  document.getElementById('pause-modal-stop-btn').onclick = () => { closePauseModal(); stopTracking(pid); };
+  document.getElementById('pause-modal').classList.add('open');
 }
 
+window.closePauseModal = function() {
+  document.getElementById('pause-modal').classList.remove('open');
+};
+
 function showResumeMenu(pid) {
-  const container = document.getElementById('pause-menu-container');
-  container.innerHTML = '';
   const p = state.projects.find(x=>x.id===pid);
-  const div = document.createElement('div');
-  div.className = 'pause-menu open';
-  div.id = 'pause-menu-'+pid;
-  div.innerHTML = `<div class="pause-menu-title">${p.name} — Pausiert</div><div class="pause-menu-btns"><button class="pause-action-btn" id="btn-resume-${pid}">▶ Weiter erfassen</button><button class="pause-action-btn stop" id="btn-stoppaused-${pid}">⏹ Endgültig stoppen</button></div>`;
-  container.appendChild(div);
-  div.onclick = (e) => e.stopPropagation();
-  document.getElementById('btn-resume-'+pid).onclick = (e) => { e.stopPropagation(); container.innerHTML=''; resumeTracking(pid); };
-  document.getElementById('btn-stoppaused-'+pid).onclick = (e) => { e.stopPropagation(); container.innerHTML=''; stopPausedTracking(pid); };
+  const t = state.pausedTracking;
+  document.getElementById('resume-modal-title').textContent = (p ? p.kuerzel + ' – ' + p.name : 'Erfassung') + ' pausiert';
+  document.getElementById('resume-modal-taetigkeit').textContent = t ? (t.taetigkeit || '–') : '–';
+  document.getElementById('resume-modal-resume-btn').onclick = () => { closeResumeModal(); resumeTracking(pid); };
+  document.getElementById('resume-modal-stop-btn').onclick = () => { closeResumeModal(); stopPausedTracking(pid); };
+  document.getElementById('resume-modal').classList.add('open');
 }
+
+window.closeResumeModal = function() {
+  document.getElementById('resume-modal').classList.remove('open');
+};
 
 async function stopPausedTracking(pid) {
   // Called when stopped while paused - no active segment to save, just clear
@@ -908,7 +983,6 @@ function pauseTracking(pid) {
   state.activeTracking = null;
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   if (reminderTimeout) { clearTimeout(reminderTimeout); reminderTimeout = null; }
-  document.getElementById('pause-menu-container').innerHTML = '';
   renderHome();
 
   // 3. Save to Firebase in background (non-blocking)
@@ -1029,8 +1103,6 @@ window.openProjectReport = function(dbId, pid) {
   state.reportSingleProject = true; // flag: hide project selector
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-report').classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('primary'));
-  document.getElementById('nav-manage').classList.add('primary');
   renderReport(true);
 };
 
@@ -1143,7 +1215,7 @@ function renderReport(fromManage) {
   if(existing) existing.remove();
   const backBtn = document.createElement('button');
   backBtn.className='back-btn'; backBtn.id='report-back-btn';
-  backBtn.innerHTML='← Zurück zu Projekten';
+  backBtn.innerHTML='ZURÜCK';
   backBtn.onclick=()=>{ state.reportSingleProject=false; showView('manage'); };
   document.getElementById('view-report').insertBefore(backBtn, document.getElementById('view-report').firstChild);
 
@@ -1216,7 +1288,7 @@ function getNextOpenPeriod(pid) {
 function renderReportTable() {
   const pid = state.reportProject;
   const allEntries = state.entries.filter(e=>e.projectId===pid).sort((a,b)=>a.start-b.start);
-  const tableWrap = document.querySelector('.time-table-wrap');
+  const tableWrap = document.getElementById('report-table-inner');
   tableWrap.innerHTML = '';
 
   if(allEntries.length===0){
@@ -1255,14 +1327,14 @@ function renderReportTable() {
       if(!e.exclude && !isBilled) openTotal+=e.duration;
       if(!e.exclude) periodTotal+=e.duration;
       const strike=e.exclude?'opacity:0.4;text-decoration:line-through':'';
-      tr.innerHTML=`<td>${formatDate(e.start)}</td><td><span class="kat-badge" style="background:${kc}22;color:${kc}">${e.kategorie}</span></td><td style="font-family:'Syne',sans-serif;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${strike}">${e.taetigkeit||'–'}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.start)}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.end)}</td><td style="${strike?'opacity:0.4':''}">${Math.floor(e.duration/60000)} min</td><td style="text-align:center">${e.exclude?'<span class="not-counted">✕</span>':''}</td><td><button class="edit-row-btn" data-editid="${e._id}">Bearbeiten</button></td>`;
+      tr.innerHTML=`<td>${formatDate(e.start)}</td><td style="font-family:'Syne',sans-serif;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${strike}">${e.taetigkeit||'–'}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.start)}</td><td style="${strike?'opacity:0.4':''}">${formatHHMM(e.end)}</td><td style="${strike?'opacity:0.4':''}">${Math.floor(e.duration/60000)} min</td><td style="text-align:center">${e.exclude?'<span class="not-counted">✕</span>':''}</td><td><button class="edit-row-btn" data-editid="${e._id}">Bearbeiten</button></td>`;
       tbody.appendChild(tr);
     });
 
     // Period subtotal
     const pr=roundToFive(periodTotal),ph=Math.floor(pr/60),pm=pr%60;
     const subtr=document.createElement('tr');subtr.className='billing-total-row';
-    subtr.innerHTML=`<td colspan="7" style="font-size:11px">${isBilled?'Abgerechnet':'Zwischensumme'} (gerundet 5 min)</td><td>${ph>0?ph+'h ':'' }${pm} min</td>`;
+    subtr.innerHTML=`<td colspan="6" style="font-size:11px">${isBilled?'Abgerechnet':'Zwischensumme'} (gerundet 5 min)</td><td>${ph>0?ph+'h ':'' }${pm} min</td>`;
     tbody.appendChild(subtr);
     table.appendChild(tbody);
     tableWrap.appendChild(table);
@@ -1272,7 +1344,7 @@ function renderReportTable() {
   const or=roundToFive(openTotal),oh=Math.floor(or/60),om=or%60;
   const totalDiv=document.createElement('div');
   totalDiv.style.cssText='background:var(--text);color:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-weight:700;font-size:13px';
-  totalDiv.innerHTML=`<span>Offen (noch nicht abgerechnet)</span><span style="font-family:'DM Mono',monospace">${oh>0?oh+'h ':'' }${om} min</span>`;
+  totalDiv.innerHTML='<span>Offen (noch nicht abgerechnet)</span><span style="font-family:DM Mono,monospace">'+(oh>0?oh+'h ':'')+om+' min</span>';
   tableWrap.appendChild(totalDiv);
 }
 
@@ -1318,16 +1390,116 @@ function buildModalKatGrid(sel) {
   KATEGORIEN.forEach((k,i)=>{const b=document.createElement('button');b.className='modal-kat-btn'+(k===sel?' selected':'');b.textContent=(i+1)+'. '+k;b.onclick=()=>{g.querySelectorAll('.modal-kat-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');};g.appendChild(b);});
 }
 
-window.openAddModal = function() {
-  if(!state.reportProject){alert('Bitte erst Projekt wählen.');return;}
-  modalEntryId=null;document.getElementById('modal-title').textContent='Eintrag hinzufügen';
+let pamProjectId = null;
+
+window.openTrackingControlModal = function() {
+  const modal = document.getElementById('tracking-control-modal');
+  if(!modal) return;
+  const t = state.activeTracking;
+  const p = t ? state.projects.find(x=>x.id===t.projectId) : null;
+  document.getElementById('tracking-control-title').textContent =
+    p ? p.kuerzel + ' – Erfassung läuft' : 'Erfassung läuft';
+  document.getElementById('tracking-control-subtitle').textContent =
+    t && t.taetigkeit ? t.taetigkeit : 'Aktive Zeiterfassung';
+  modal.classList.add('open');
+};
+
+window.closeTrackingControlModal = function() {
+  const modal = document.getElementById('tracking-control-modal');
+  if(modal) modal.classList.remove('open');
+};
+
+document.getElementById('tracking-control-modal').addEventListener('click', function(e) {
+  if(e.target===this) { closeTrackingControlModal(); return; }
+  const btn = e.target.closest('[data-action]');
+  if(btn && btn.dataset.action==='tracking-cancel') closeTrackingControlModal();
+});
+
+document.getElementById('tracking-pause-btn').onclick = function() {
+  closeTrackingControlModal();
+  if(typeof pauseTracking === 'function') pauseTracking();
+};
+
+document.getElementById('tracking-stop-btn').onclick = function() {
+  closeTrackingControlModal();
+  if(typeof stopTracking === 'function') stopTracking();
+};
+
+window.openProjectModal = function(pid) {
+  pamProjectId = pid;
+  const p = state.projects.find(x=>x.id===pid);
+  document.getElementById('pam-title').textContent = p ? p.kuerzel + ' – ' + p.name : 'Projekt';
+  document.getElementById('pam-taetigkeit').value = '';
+  document.getElementById('project-action-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('pam-taetigkeit').focus(), 100);
+
+  document.getElementById('pam-start-btn').onclick = () => {
+    const taetigkeit = document.getElementById('pam-taetigkeit').value.trim();
+    closePAM();
+    startTrackingDirect(pid, taetigkeit);
+  };
+  document.getElementById('pam-add-btn').onclick = () => {
+    const taetigkeit = document.getElementById('pam-taetigkeit').value.trim();
+    closePAM();
+    // Pre-fill taetigkeit in add modal
+    state.reportProject = pid;
+    openAddModalWithTaetigkeit(taetigkeit);
+  };
+};
+
+window.closePAM = function() {
+  document.getElementById('project-action-modal').classList.remove('open');
+  pamProjectId = null;
+};
+
+// Close PAM on overlay click
+document.getElementById('project-action-modal').addEventListener('click', function(e) {
+  if(e.target===this) { closePAM(); return; }
+  const btn = e.target.closest('[data-action]');
+  if(btn && btn.dataset.action==='pam-cancel') closePAM();
+});
+
+// Enter key in PAM starts tracking
+document.getElementById('pam-taetigkeit').addEventListener('keydown', function(e) {
+  if(e.key==='Enter') document.getElementById('pam-start-btn').click();
+});
+
+async function startTrackingDirect(pid, taetigkeit) {
+  if(state.activeTracking){
+    if(!confirm('Läuft bereits. Stoppen und neu starten?'))return;
+    await stopTracking(state.activeTracking.projectId,true);
+  }
+  if(state.pausedTracking && state.pausedTracking.projectId !== pid){
+    if(!confirm('Es gibt eine pausierte Erfassung. Verwerfen?'))return;
+    state.pausedTracking=null;
+  }
+  const startTime = Date.now();
+  state.activeTracking={projectId:pid, kategorie:'', taetigkeit, startTime};
+  saveActiveTrackingStatus({projectId:pid, kategorie:'', taetigkeit, startTime});
+  startTimerUI(pid);
+  if(reminderTimeout)clearTimeout(reminderTimeout);
+  reminderTimeout=setTimeout(()=>sendReminder(pid),60*60*1000);
+  renderHome(); checkNotifPermission();
+}
+
+function openAddModalWithTaetigkeit(taetigkeit) {
+  if(!state.reportProject) return;
+  modalEntryId=null;
+  document.getElementById('modal-title').textContent='Eintrag hinzufügen';
   document.getElementById('modal-delete-btn').style.display='none';
   document.getElementById('modal-date').value=new Date().toISOString().slice(0,10);
-  document.getElementById('modal-taetigkeit').value='';
-  document.getElementById('modal-start').value='09:00';document.getElementById('modal-end').value='10:00';
+  document.getElementById('modal-taetigkeit').value=taetigkeit||'';
+  document.getElementById('modal-start').value='09:00';
+  document.getElementById('modal-end').value='10:00';
   document.getElementById('modal-exclude').checked=false;
   buildBillingSelect(state.reportProject, getNextOpenPeriod(state.reportProject));
-  buildModalKatGrid('Planung');document.getElementById('edit-modal').classList.add('open');
+
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+window.openAddModal = function() {
+  if(!state.reportProject){alert('Bitte erst ein Projekt im Bericht auswählen.');return;}
+  openAddModalWithTaetigkeit('');
 };
 
 window.openEditModal = function(dbId) {
@@ -1340,7 +1512,7 @@ window.openEditModal = function(dbId) {
   document.getElementById('modal-end').value=new Date(e.end).toTimeString().slice(0,5);
   document.getElementById('modal-exclude').checked = !!e.exclude;
   buildBillingSelect(e.projectId, e.billingPeriod||1);
-  buildModalKatGrid(e.kategorie);document.getElementById('edit-modal').classList.add('open');
+  document.getElementById('edit-modal').classList.add('open');
 };
 
 window.closeModal = function() { document.getElementById('edit-modal').classList.remove('open');modalEntryId=null; };
@@ -1351,8 +1523,8 @@ window.saveModal = async function() {
   const endVal=document.getElementById('modal-end').value;
   const taetigkeit=document.getElementById('modal-taetigkeit').value.trim();
   const selBtn=document.querySelector('#modal-kat-grid .modal-kat-btn.selected');
-  const kat=selBtn?selBtn.textContent.replace(/^\d+\. /,''):'';
-  if(!dateVal||!startVal||!endVal||!kat){alert('Bitte alle Felder ausfüllen.');return;}
+  const kat='';
+  if(!dateVal||!startVal||!endVal){alert('Bitte Datum, Start- und Endzeit ausfüllen.');return;}
   const startTs=new Date(dateVal+'T'+startVal).getTime();
   const endTs=new Date(dateVal+'T'+endVal).getTime();
   if(endTs<=startTs){alert('Endzeit muss nach Startzeit liegen.');return;}
@@ -1400,7 +1572,6 @@ window.exportPDF = function() {
       const strike = e.exclude ? 'text-decoration:line-through;opacity:0.5;' : '';
       rowsHtml += `<tr style="background:${bg}">
         <td style="${strike}">${formatDate(e.start)}</td>
-        <td style="${strike}">${e.kategorie}</td>
         <td style="${strike}">${e.taetigkeit||'&ndash;'}</td>
         <td style="${strike}">${formatHHMM(e.start)}</td>
         <td style="${strike}">${formatHHMM(e.end)}</td>
@@ -1410,9 +1581,9 @@ window.exportPDF = function() {
     });
     const pr=roundToFive(periodTotal), ph=Math.floor(pr/60), pm=pr%60;
     allSectionsHtml += `
-      <tr><td colspan="7" style="background:${headerColor};font-weight:bold;padding:7px 8px;border-top:2px solid #bbb;font-size:10pt">${headerText}</td></tr>
+      <tr><td colspan="6" style="background:${headerColor};font-weight:bold;padding:7px 8px;border-top:2px solid #bbb;font-size:10pt">${headerText}</td></tr>
       ${rowsHtml}
-      <tr style="background:#f0f0f0"><td colspan="6" style="font-weight:bold;padding:5px 8px;font-size:10pt">${isBilled?'Abgerechnet':'Zwischensumme'} (gerundet 5 min)</td><td style="font-weight:bold;padding:5px 8px">${ph>0?ph+'h ':'' }${pm} min</td></tr>`;
+      <tr style="background:#f0f0f0"><td colspan="5" style="font-weight:bold;padding:5px 8px;font-size:10pt">${isBilled?'Abgerechnet':'Zwischensumme'} (gerundet 5 min)</td><td style="font-weight:bold;padding:5px 8px">${ph>0?ph+'h ':'' }${pm} min</td></tr>`;
   }
 
   const or=roundToFive(openTotal), oh=Math.floor(or/60), om=or%60;
@@ -1439,9 +1610,9 @@ window.exportPDF = function() {
   </div>
   <div class="project-title">${p?p.kuerzel:''} &nbsp;&nbsp; ${p?p.name:''}</div>
   <table>
-    <thead><tr><th>Datum</th><th>Kategorie</th><th>T&auml;tigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th></tr></thead>
+    <thead><tr><th>Datum</th><th>T&auml;tigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th></tr></thead>
     <tbody>${allSectionsHtml}</tbody>
-    <tfoot><tr class="open-total"><td colspan="6">Offen / noch nicht abgerechnet (gerundet 5 min)</td><td>${oh>0?oh+'h ':'' }${om} min</td></tr></tfoot>
+    <tfoot><tr class="open-total"><td colspan="5">Offen / noch nicht abgerechnet (gerundet 5 min)</td><td>${oh>0?oh+'h ':'' }${om} min</td></tr></tfoot>
   </table>
   ${notesHtml}
   </body></html>`;
@@ -1480,13 +1651,13 @@ Kürzel: ${p?p.kuerzel:''}
     csv+=isBilled
       ? `Abrechnung ${period} - abgeschlossen ${billedDate}\n`
       : `Abrechnung ${period} - laufend\n`;
-    csv+="Datum,Kategorie,Taetigkeit,Start,Ende,Dauer (min),Nicht berechnet\n";
+    csv+="Datum,Taetigkeit,Start,Ende,Dauer (min),Nicht berechnet\n";
     let periodTotal=0;
     pe.forEach(e=>{
       const mins=Math.floor(e.duration/60000);
       if(!e.exclude) periodTotal+=e.duration;
       if(!e.exclude&&!isBilled) openTotal+=e.duration;
-      csv+=`"${formatDate(e.start)}","${e.kategorie}","${e.taetigkeit||''}","${formatHHMM(e.start)}","${formatHHMM(e.end)}",${mins},"${e.exclude?'nicht berechnet':''}"
+      csv+=`"${formatDate(e.start)}","${e.taetigkeit||''}","${formatHHMM(e.start)}","${formatHHMM(e.end)}",${mins},"${e.exclude?'nicht berechnet':''}"
 `;
     });
     const pr=roundToFive(periodTotal),ph=Math.floor(pr/60),pm2=pr%60;
@@ -1520,7 +1691,8 @@ document.getElementById('edit-modal').addEventListener('click',function(e){
   if(btn.dataset.action==='modal-delete') deleteEntry();
 });
 // Event delegation for edit buttons in report table
-document.querySelector('.time-table-wrap').addEventListener('click', function(e) {
+document.addEventListener('click', function(e) {
+  if(!e.target.closest('#report-table-inner')) return;
   const btn = e.target.closest('[data-editid]');
   if(!btn) return;
   const id = btn.dataset.editid;
@@ -1558,6 +1730,13 @@ document.addEventListener('keydown', function(e) {
 document.getElementById('rename-kuerzel').addEventListener('input',function(){this.value=this.value.toUpperCase().replace(/[^A-ZÄÖÜ0-9]/g,'');});
 window.logout = logout;
 window.startApp = startApp;
+
+document.getElementById('pause-modal').addEventListener('click', function(e) {
+  if(e.target===this) closePauseModal();
+});
+document.getElementById('resume-modal').addEventListener('click', function(e) {
+  if(e.target===this) closeResumeModal();
+});
 </script>
 </body>
 </html>
