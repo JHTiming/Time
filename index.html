@@ -440,6 +440,15 @@
 
 <!-- PIN Script (plain, not module) -->
 <script>
+// Global error handler
+window.addEventListener('error', function(e) {
+  console.error('JS Error:', e.message, e.lineno);
+});
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('Promise error:', e.reason);
+  e.preventDefault();
+});
+
 const PIN_STORAGE_KEY = 'zeit_pin_hash';
 let pinBuffer = '';
 let pinMode = 'check';
@@ -850,6 +859,7 @@ async function doSaveProject() {
 
 // ── HOME ─────────────────────────────────────────────────────
 function renderHome() {
+  if (!currentUserId) return; // not logged in yet
   const grid=document.getElementById('projects-grid');
   const dc=document.getElementById('dropdown-container');
   grid.innerHTML=''; dc.innerHTML='';
@@ -1043,6 +1053,7 @@ function sendReminder(pid){if(!state.activeTracking||state.activeTracking.projec
 
 // ── MANAGE ───────────────────────────────────────────────────
 function renderManage() {
+  if (!currentUserId) return;
   const list=document.getElementById('manage-list');list.innerHTML='';
   if(state.projects.length===0){list.innerHTML='<div class="empty-state">Keine Projekte vorhanden.</div>';return;}
   const sortedProjects = [...state.projects].sort((a,b)=>(a.order||0)-(b.order||0));
@@ -1540,7 +1551,7 @@ window.saveModal = async function() {
     const entry={userId:currentUserId,projectId:state.reportProject,kategorie:kat,taetigkeit,start:startTs,end:endTs,duration,exclude,billingPeriod};
     await saveEntry(entry);
   }
-  closeModal();renderReport();
+  closeModal();renderReport();if(document.getElementById("view-home").classList.contains("active"))renderHome();
 };
 
 window.exportPDF = function() {
@@ -1628,7 +1639,7 @@ window.deleteEntry = async function() {
   if(!modalEntryId)return;if(!confirm('Eintrag löschen?'))return;
   await deleteEntryFromDB(modalEntryId);
   state.entries=state.entries.filter(e=>e._id!==modalEntryId);
-  closeModal();renderReport();
+  closeModal();renderReport();if(document.getElementById("view-home").classList.contains("active"))renderHome();
 };
 
 window.exportCSV = function() {
