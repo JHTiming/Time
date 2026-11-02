@@ -382,6 +382,10 @@
         <input class="form-input" id="rename-kuerzel" type="text" maxlength="5" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:20px;letter-spacing:2px">
       </div>
       <div class="form-group">
+        <label class="form-label">Netto-Stundensatz (€)</label>
+        <input class="form-input" id="rename-rate" type="text" inputmode="decimal" placeholder="z.B. 85,00">
+      </div>
+      <div class="form-group">
         <label class="form-label">Farbe</label>
         <div class="color-picker" id="rename-color-picker">
           <div class="color-swatch" data-color="#F5C2C2" style="background:#F5C2C2"></div>
@@ -795,6 +799,16 @@ function formatTime(ms) { const h=Math.floor(ms/3.6e6),m=Math.floor((ms%3.6e6)/6
 function formatHHMM(ts) { return new Date(ts).toTimeString().slice(0,5); }
 function formatDate(ts) { return new Date(ts).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}); }
 function roundToFive(ms) { return Math.round(ms/60000/5)*5; }
+function projOrder(p) { return typeof p.order === 'number' ? p.order : 0; }
+function sortProjects(list) {
+  return [...list].sort((a,b) => {
+    if (!!a.archived !== !!b.archived) return a.archived ? 1 : -1;
+    return projOrder(a) - projOrder(b);
+  });
+}
+function formatEUR(n) { return n.toLocaleString('de-DE',{style:'currency',currency:'EUR'}); }
+function formatHM(mins) { const h=Math.floor(mins/60), m=mins%60; return (h>0?h+' h ':'')+m+' min'; }
+
 function totalForProject(pid) {
   const openPeriod = getNextOpenPeriod(pid);
   return state.entries
@@ -850,7 +864,7 @@ async function doSaveProject() {
   const name=document.getElementById('new-name').value.trim();
   const kuerzel=document.getElementById('new-kuerzel').value.trim().toUpperCase();
   if(!name||kuerzel.length<3||kuerzel.length>5){alert('Bitte Projektname und 3–5-stelliges Kürzel eingeben.');return;}
-  const proj={userId:currentUserId, id:Date.now(), name, kuerzel, color:state.selectedColor, order:state.projects.length};
+  const proj={userId:currentUserId, id:Date.now(), name, kuerzel, color:state.selectedColor, order:(state.projects.length ? Math.min(...state.projects.map(projOrder)) - 1 : 0)};
   state.projects.push(proj);
   await saveProject(proj);
   cancelNewProject();
@@ -863,7 +877,7 @@ function renderHome() {
   const grid=document.getElementById('projects-grid');
   const dc=document.getElementById('dropdown-container');
   grid.innerHTML=''; dc.innerHTML='';
-  const visibleProjects = state.projects.filter(p=>!p.archived).sort((a,b)=>(a.order||0)-(b.order||0));
+  const visibleProjects = sortProjects(state.projects.filter(p=>!p.archived));
   document.getElementById('empty-state').style.display=visibleProjects.length===0?'block':'none';
   visibleProjects.forEach(p=>{
     const total=totalForProject(p.id);
@@ -1056,7 +1070,7 @@ function renderManage() {
   if (!currentUserId) return;
   const list=document.getElementById('manage-list');list.innerHTML='';
   if(state.projects.length===0){list.innerHTML='<div class="empty-state">Keine Projekte vorhanden.</div>';return;}
-  const sortedProjects = [...state.projects].sort((a,b)=>(a.order||0)-(b.order||0));
+  const sortedProjects = sortProjects(state.projects);
   sortedProjects.forEach(p=>{
     const pal=getPal(p.color);const div=document.createElement('div');div.className='proj-list-item';
     const archivedLabel = p.archived ? '<span class="archived-badge">Archiviert</span>' : '';
@@ -1076,6 +1090,7 @@ window.openRenameModal = function(dbId) {
   document.getElementById('rename-name').value = p.name;
   document.getElementById('rename-kuerzel').value = p.kuerzel;
   document.getElementById('rename-notes').value = p.notes || '';
+  document.getElementById('rename-rate').value = p.rate ? String(p.rate).replace('.', ',') : '';
   document.getElementById('rename-show-notes').checked = !!p.showNotes;
   document.getElementById('rename-archived').checked = !!p.archived;
   // Set color picker
@@ -1100,6 +1115,9 @@ window.saveRename = async function() {
   state.projects[idx].name = name;
   state.projects[idx].kuerzel = kuerzel;
   state.projects[idx].notes = document.getElementById('rename-notes').value.trim();
+  const rateRaw = document.getElementById('rename-rate').value.trim().replace(',', '.');
+  const rateNum = parseFloat(rateRaw);
+  state.projects[idx].rate = (isFinite(rateNum) && rateNum > 0) ? rateNum : 0;
   state.projects[idx].showNotes = document.getElementById('rename-show-notes').checked;
   state.projects[idx].archived = document.getElementById('rename-archived').checked;
   if(selColor) state.projects[idx].color = selColor.dataset.color;
@@ -1186,7 +1204,7 @@ document.getElementById('manage-list').addEventListener('drop', function(e) {
   const targetItem = e.target.closest('.proj-list-item');
   if (!targetItem || !dragSrcDbId || targetItem.dataset.dbid === dragSrcDbId) return;
 
-  const sorted = [...state.projects].sort((a,b)=>(a.order||0)-(b.order||0));
+  const sorted = sortProjects(state.projects);
   const srcIdx = sorted.findIndex(p => p._id === dragSrcDbId);
   const tgtIdx = sorted.findIndex(p => p._id === targetItem.dataset.dbid);
   if (srcIdx < 0 || tgtIdx < 0) return;
@@ -1357,6 +1375,17 @@ function renderReportTable() {
   totalDiv.style.cssText='background:var(--text);color:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-weight:700;font-size:13px';
   totalDiv.innerHTML='<span>Offen (noch nicht abgerechnet)</span><span style="font-family:DM Mono,monospace">'+(oh>0?oh+'h ':'')+om+' min</span>';
   tableWrap.appendChild(totalDiv);
+
+  // Netto-Honorar
+  const proj = state.projects.find(x=>x.id===pid);
+  if (proj && proj.rate > 0) {
+    const fee = proj.rate * (or/60);
+    const feeDiv = document.createElement('div');
+    feeDiv.style.cssText = 'border:1.5px solid var(--text);border-radius:var(--radius-sm);padding:10px 14px;margin-top:8px;font-size:13px';
+    feeDiv.innerHTML = '<div style="display:flex;justify-content:space-between;color:var(--muted);font-size:12px"><span>Netto-Stundensatz</span><span>'+formatEUR(proj.rate)+'</span></div>'
+      + '<div style="display:flex;justify-content:space-between;font-weight:700;margin-top:4px"><span>Netto-Honorar ('+formatHM(or)+')</span><span>'+formatEUR(fee)+'</span></div>';
+    tableWrap.appendChild(feeDiv);
+  }
 }
 
 function renderSummary() {
@@ -1563,70 +1592,78 @@ window.exportPDF = function() {
   const openPeriod = getNextOpenPeriod(pid);
   let openTotal = 0;
   let allSectionsHtml = '';
+  const theadHtml = '<thead><tr><th style="width:13%">Datum</th><th style="width:37%">T&auml;tigkeit</th><th style="width:10%">Start</th><th style="width:10%">Ende</th><th style="width:12%">Dauer</th><th style="width:18%">Nicht berechnet</th></tr></thead>';
 
   for(let period=1; period<=Math.max(maxPeriod,openPeriod); period++){
     const pe = entries.filter(e=>(e.billingPeriod||1)===period);
     if(pe.length===0) continue;
     const isBilled = pe.every(e=>e.billed);
     const billedDate = isBilled ? (pe[0].billedDate||'') : '';
-    const headerColor = isBilled ? '#e8f5e9' : '#e8f0fe';
     const headerText = isBilled
-      ? `Abrechnung ${period} &middot; abgeschlossen ${billedDate} &#10003;`
-      : `Abrechnung ${period} &middot; laufend`;
+      ? 'Abrechnung ' + period + ' &ndash; abgeschlossen ' + billedDate + ' &#10003;'
+      : 'Abrechnung ' + period + ' &ndash; laufende Abrechnung';
     let periodTotal = 0;
     let rowsHtml = '';
     pe.forEach((e,i) => {
       const mins = Math.floor(e.duration/60000);
       if(!e.exclude) periodTotal += e.duration;
       if(!e.exclude && !isBilled) openTotal += e.duration;
-      const bg = i%2===0 ? '#f9f9f9' : '#fff';
-      const strike = e.exclude ? 'text-decoration:line-through;opacity:0.5;' : '';
-      rowsHtml += `<tr style="background:${bg}">
-        <td style="${strike}">${formatDate(e.start)}</td>
-        <td style="${strike}">${e.taetigkeit||'&ndash;'}</td>
-        <td style="${strike}">${formatHHMM(e.start)}</td>
-        <td style="${strike}">${formatHHMM(e.end)}</td>
-        <td style="${strike}">${mins} min</td>
-        <td style="text-align:center;color:#c00;font-weight:700">${e.exclude?'&#10005;':''}</td>
-      </tr>`;
+      const bg = i%2===0 ? '#f6f6f6' : '#ffffff';
+      const strike = e.exclude ? 'text-decoration:line-through;color:#888;' : '';
+      rowsHtml += '<tr style="background:'+bg+'">'
+        + '<td style="'+strike+'">'+formatDate(e.start)+'</td>'
+        + '<td style="'+strike+'">'+(e.taetigkeit||'&ndash;')+'</td>'
+        + '<td style="'+strike+'">'+formatHHMM(e.start)+'</td>'
+        + '<td style="'+strike+'">'+formatHHMM(e.end)+'</td>'
+        + '<td style="'+strike+'">'+mins+' min</td>'
+        + '<td style="text-align:center;color:#c00;font-weight:bold">'+(e.exclude?'&#10005;':'')+'</td>'
+        + '</tr>';
     });
-    const pr=roundToFive(periodTotal), ph=Math.floor(pr/60), pm=pr%60;
-    allSectionsHtml += `
-      <tr><td colspan="6" style="background:${headerColor};font-weight:bold;padding:7px 8px;border-top:2px solid #bbb;font-size:10pt">${headerText}</td></tr>
-      ${rowsHtml}
-      <tr style="background:#f0f0f0"><td colspan="5" style="font-weight:bold;padding:5px 8px;font-size:10pt">${isBilled?'Abgerechnet':'Zwischensumme'} (gerundet 5 min)</td><td style="font-weight:bold;padding:5px 8px">${ph>0?ph+'h ':'' }${pm} min</td></tr>`;
+    const pr = roundToFive(periodTotal);
+    allSectionsHtml += '<div class="period-head '+(isBilled?'billed':'open')+'">'+headerText+'</div>'
+      + '<table class="period-table">' + theadHtml + '<tbody>' + rowsHtml
+      + '<tr class="sub"><td colspan="5">'+(isBilled?'Abgerechnet':'Zwischensumme')+' (gerundet 5 min)</td><td>'+formatHM(pr)+'</td></tr>'
+      + '</tbody></table>';
   }
 
-  const or=roundToFive(openTotal), oh=Math.floor(or/60), om=or%60;
+  const or = roundToFive(openTotal);
+  let feeHtml = '';
+  if (p && p.rate > 0) {
+    const fee = p.rate * (or/60);
+    feeHtml = '<tr><td>Netto-Stundensatz</td><td class="r">'+formatEUR(p.rate)+'</td></tr>'
+      + '<tr class="fee"><td>Netto-Honorar ('+formatHM(or)+' &times; '+formatEUR(p.rate)+')</td><td class="r">'+formatEUR(fee)+'</td></tr>';
+  }
   const notesHtml = (p && p.showNotes && p.notes)
-    ? `<div style="margin-top:18px"><div style="font-weight:bold;font-size:11pt;margin-bottom:6px;color:#555">Hinweise</div><div style="font-size:11pt;line-height:1.6;white-space:pre-wrap">${p.notes}</div></div>`
+    ? '<div style="margin-top:18px"><div style="font-weight:bold;font-size:11pt;margin-bottom:6px;color:#555">Hinweise</div><div style="font-size:11pt;line-height:1.6;white-space:pre-wrap">'+p.notes+'</div></div>'
     : '';
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <style>
-    @page { size: A4 portrait; margin: 20mm 15mm 20mm 15mm; }
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 11pt; color: #222; }
-    .header { display:flex; justify-content:space-between; font-size:10pt; border-bottom:1px solid #ccc; padding-bottom:6px; margin-bottom:14px; color:#444; }
-    .project-title { font-size:12pt; font-weight:bold; margin-bottom:14px; }
-    table { width:100%; border-collapse:collapse; }
-    th { font-size:11pt; font-weight:bold; color:#555; padding:6px 8px; text-align:left; background:#e8e8e8; border-bottom:2px solid #ccc; }
-    td { padding:5px 8px; border-bottom:1px solid #eee; font-size:11pt; }
-    .open-total td { font-weight:bold; border-top:3px solid #333; background:#1a1916; color:#fff; padding:7px 8px; }
-  </style></head><body>
-  <div class="header">
-    <span>Architekturbüro Hormann</span>
-    <span>Arbeitszeiterfassung</span>
-    <span>${today}</span>
-  </div>
-  <div class="project-title">${p?p.kuerzel:''} &nbsp;&nbsp; ${p?p.name:''}</div>
-  <table>
-    <thead><tr><th>Datum</th><th>T&auml;tigkeit</th><th>Start</th><th>Ende</th><th>Dauer</th><th>Nicht berechnet</th></tr></thead>
-    <tbody>${allSectionsHtml}</tbody>
-    <tfoot><tr class="open-total"><td colspan="5">Offen / noch nicht abgerechnet (gerundet 5 min)</td><td>${oh>0?oh+'h ':'' }${om} min</td></tr></tfoot>
-  </table>
-  ${notesHtml}
-  </body></html>`;
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Arbeitszeiterfassung</title>'
+  + '<style>'
+  + '@page { size: A4 portrait; margin: 20mm 15mm 20mm 15mm; }'
+  + '* { box-sizing: border-box; }'
+  + 'body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }'
+  + '.header { display:flex; justify-content:space-between; font-size:10pt; border-bottom:1px solid #999; padding-bottom:6px; margin-bottom:14px; color:#000; }'
+  + '.project-title { font-size:12pt; font-weight:bold; margin-bottom:14px; }'
+  + '.period-head { font-size:11pt; font-weight:bold; color:#000; padding:7px 8px; margin-top:14px; border-left:5px solid #888; background:#e4e4e4; page-break-after:avoid; break-after:avoid; }'
+  + '.period-head.billed { border-left-color:#2d8a4f; background:#e3f1e7; }'
+  + '.period-head.open { border-left-color:#2a5fb0; background:#e0e9f7; }'
+  + 'table { width:100%; border-collapse:collapse; table-layout:fixed; }'
+  + 'th { font-size:11pt; font-weight:bold; color:#000; padding:6px 8px; text-align:left; background:#d9d9d9; border-bottom:2px solid #888; }'
+  + 'td { padding:5px 8px; border-bottom:1px solid #ddd; font-size:11pt; color:#000; word-wrap:break-word; }'
+  + 'tr { page-break-inside:avoid; }'
+  + 'tr.sub td { font-weight:bold; background:#ececec; border-top:1px solid #888; }'
+  + 'table.sum { margin-top:16px; }'
+  + 'table.sum td { font-weight:bold; border-top:1px solid #888; border-bottom:none; }'
+  + 'table.sum tr.total td { border-top:3px solid #000; background:#ececec; }'
+  + 'table.sum tr.fee td { background:#d9d9d9; font-size:12pt; border-top:2px solid #000; }'
+  + 'td.r { text-align:right; white-space:nowrap; width:30%; }'
+  + '</style></head><body>'
+  + '<div class="header"><span>Architekturb&uuml;ro Hormann</span><span>Arbeitszeiterfassung</span><span>'+today+'</span></div>'
+  + '<div class="project-title">'+(p?p.kuerzel:'')+' &nbsp;&nbsp; '+(p?p.name:'')+'</div>'
+  + allSectionsHtml
+  + '<table class="sum"><tr class="total"><td>Offen / noch nicht abgerechnet (gerundet 5 min)</td><td class="r">'+formatHM(or)+'</td></tr>'+feeHtml+'</table>'
+  + notesHtml
+  + '</body></html>';
 
   const w = window.open('','_blank','width=800,height=600');
   w.document.write(html);
@@ -1680,6 +1717,7 @@ Kürzel: ${p?p.kuerzel:''}
   const or=roundToFive(openTotal),oh=Math.floor(or/60),om=or%60;
   csv+=`Offen / noch nicht abgerechnet (gerundet 5 min),,,,,${oh>0?oh+'h ':'' }${om} min
 `;
+  if(p&&p.rate>0){csv+='Netto-Stundensatz,,,,,'+formatEUR(p.rate)+'\n'+'Netto-Honorar ('+formatHM(or)+'),,,,,'+formatEUR(p.rate*(or/60))+'\n';}
   if(p&&p.showNotes&&p.notes){csv+=`
 Hinweise:
 "${p.notes.replace(/"/g,'""')}"
